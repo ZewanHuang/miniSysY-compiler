@@ -1,4 +1,5 @@
 import lexer.Scanner;
+import parser.Parser;
 import utils.FileUtils;
 
 import java.io.IOException;
@@ -14,10 +15,12 @@ public class Main {
                     lexer.dumpTokens();
                     break;
                 case "-llvm":
+                    Parser parser = new Parser();
+                    String res = parser.parse(src);
                     if (args.length >= 4 && args[2].equals("-o"))
-                        FileUtils.writeFile(args[3], src);
+                        FileUtils.writeFile(args[3], res);
                     else
-                        FileUtils.writeFile("case.ll", src);
+                        FileUtils.writeFile("case.ll", res);
                     break;
                 case "-dump-symbol-table":
                     break;
