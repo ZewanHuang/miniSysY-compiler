@@ -1,5 +1,7 @@
 package utils;
 
+import java.util.regex.Pattern;
+
 public class StringUtils {
 
     /**
@@ -13,5 +15,16 @@ public class StringUtils {
         char[] cs = str.toCharArray();
         cs[index] -= 32;
         return String.valueOf(cs);
+    }
+
+    /**
+     * 判断字符串是否为非负整数
+     *
+     * @param str   字符串
+     * @return  是否为非负整数
+     */
+    public static boolean isNonNegInteger(String str) {
+        Pattern pattern = Pattern.compile("^[\\d]*$");
+        return pattern.matcher(str).matches();
     }
 }

@@ -8,6 +8,6 @@ public class Parser {
         Scanner scanner = new Scanner(src);
         Descender desc = new Descender(scanner);
         desc.compUnit();
-        return desc.result;
+        return desc.getRecord();
     }
 }
