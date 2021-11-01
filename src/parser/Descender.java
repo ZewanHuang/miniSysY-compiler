@@ -75,10 +75,10 @@ public class Descender {
     }
     public void stmt() {
         if (curToken.equals("return")) {
-//            record += "ret ";
             nextToken();
 
-            dealExpr();
+            String operaRes = operaExpr();
+            record += "ret i32 " + operaRes;
 
             if (curToken.equals(";")) {
                 record += "\n";
@@ -86,14 +86,14 @@ public class Descender {
             } else error();
         }
     }
-    public void dealExpr() {
+    public String operaExpr() {
         exprs = new ArrayList<>();
         expr();
         System.out.println(exprs);
         Prioritizer prior = new Prioritizer(exprs);
         prior.analysis();
         record += prior.getRecord();
-        record += "ret i32 " + prior.getResult();
+        return prior.getResult();
     }
     public void expr() {
         addExpr();
