@@ -21,6 +21,10 @@ public class Token {
         return symbol.equals("Ident");
     }
 
+    public boolean isEmpty() {
+        return this.symbol.equals("") && this.value.equals("");
+    }
+
     public String toString() {
         return symbol + "  " + value;
     }

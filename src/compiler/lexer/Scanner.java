@@ -3,6 +3,8 @@ package compiler.lexer;
 import compiler.utils.StringUtils;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
 
 import static compiler.exception.CompileException.error;
 
@@ -200,11 +202,28 @@ public class Scanner {
         return token;
     }
 
-    public String dumpTokens() {
+    /**
+     * 扫描解析得到 tokens
+     *
+     * @return token列表
+     */
+    public ArrayList<Token> dumpTokens() {
+        ArrayList<Token> tokens = new ArrayList<>();
+        while (ptr < src.length()-1)
+            tokens.add(getToken());
+        return tokens;
+    }
+
+    /**
+     * 调用 dumpTokens 获取 tokens 的字符串形式
+     *
+     * @return 字符串
+     */
+    public String getTokens() {
         StringBuilder str = new StringBuilder();
-        while (ptr < src.length()-1) {
-            str.append(getToken()).append("\n");
-        }
+        ArrayList<Token> tokens = dumpTokens();
+        for (Token token : tokens)
+            str.append(token).append("\n");
         return str.toString();
     }
 

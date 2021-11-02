@@ -20,7 +20,7 @@ public class Main {
                     System.out.println(parser.dumpAST());
                 }
                 case "-dump-symbol-table" -> {
-                    System.out.println("symbol-table");
+                    System.out.println(parser.dumpSymTable());
                 }
                 case "-dump-answers" -> {
                     System.out.println(FileUtils.readFile(args[1]));

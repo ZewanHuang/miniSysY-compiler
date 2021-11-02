@@ -67,6 +67,23 @@ public class TreeNode<T> {
         else return parent.getLevel()+1;
     }
 
+    /**
+     * 获取当前节点的第 index+1 个节点
+     *
+     * @param index 次序
+     * @return 节点
+     */
+    public TreeNode<T> getChildAt(int index) {
+        if (index < this.children.size())
+            return this.children.get(index);
+        return null;
+    }
+
+    /**
+     * 获取树的根节点
+     *
+     * @return 根节点
+     */
     public TreeNode<T> getRoot() {
         TreeNode<T> node = this;
         while (!node.isRoot()) {
@@ -75,6 +92,25 @@ public class TreeNode<T> {
         return node;
     }
 
+    /**
+     * 获取当前节点延申的叶子节点
+     *
+     * @return 节点链表
+     */
+    public List<TreeNode<T>> getLeaves() {
+        List<TreeNode<T>> leaves = new LinkedList<>();
+        if (this.isLeaf())
+            leaves.add(this);
+        for (TreeNode<T> child : this.children)
+            leaves.addAll(child.getLeaves());
+        return leaves;
+    }
+
+    /**
+     * 树的可视化
+     *
+     * @return 字符串形式的树
+     */
     public String getTree() {
         StringBuilder str = new StringBuilder();
         TreeNode<T> node = this;

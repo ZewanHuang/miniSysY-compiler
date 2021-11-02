@@ -1,34 +1,35 @@
 package compiler.parser;
 
-import compiler.lexer.Scanner;
 import compiler.lexer.Token;
 import compiler.parser.ast.NodeData;
 import compiler.parser.ast.TreeNode;
+
+import java.util.ArrayList;
 
 import static compiler.exception.CompileException.error;
 
 public class Descender {
 
-    public String src;                  /* 递归下降解析的文本 */
-    private final Scanner scanner;      /* 扫描器 */
+    public ArrayList<Token> tokens;     /* 递归下降处理的 tokens */
+    private int tokenId;                /* 当前 token 的序号 */
     private Token curToken;             /* 当前 token */
     private TreeNode<NodeData> ast;     /* 语法树 */
 
     /**
      * 构造函数
      *
-     * @param src 递归下降解析的文本
+     * @param tokens 递归下降处理的 tokens
      */
-    public Descender(String src) {
-        this.src = src;
-        this.scanner = new Scanner(src);
+    public Descender(ArrayList<Token> tokens) {
+        this.tokens = tokens;
+        this.tokenId = 0;
         nextToken();
     }
 
     public TreeNode<NodeData> buildAST() {
         ast = new TreeNode<>(new NodeData("CompUnit"));
         compUnit();
-        if (curToken != null) error();
+        if (!curToken.isEmpty()) error();
         return ast.getRoot();
     }
 
@@ -36,7 +37,7 @@ public class Descender {
      * 获取下一个 token 存储于 curToken
      */
     private void nextToken() {
-        curToken = scanner.getToken();
+        curToken = tokens.get(tokenId++);
     }
 
     /**
@@ -146,6 +147,26 @@ public class Descender {
 
     private void varDecl() {
         TreeNode<NodeData> node = ast;
+        ast = node.addChild(new NodeData("BType"));
+        btype();
+        ast = node.addChild(new NodeData("VarDef"));
+        varDef();
+        while (!curToken.equals(";")) {
+            if (curToken.equals(",")) {
+                ast = node.addChild(new NodeData(curToken));
+                nextToken();
+                ast = node.addChild(new NodeData("VarDef"));
+                varDef();
+            } else error();
+        }
+        if (curToken.equals(";")) {
+            ast = node.addChild(new NodeData(curToken));
+            nextToken();
+        } else error();
+    }
+
+    private void varDef() {
+        TreeNode<NodeData> node = ast;
         if (curToken.isIdent()) {
             ast = node.addChild(new NodeData(curToken));
             nextToken();
@@ -200,7 +221,7 @@ public class Descender {
 
     private void stmt() {
         TreeNode<NodeData> node = ast;
-        if (curToken.isIdent()) {
+        if (curToken.isIdent() && tokens.get(tokenId).equals("=")) {
             ast = node.addChild(new NodeData(curToken));
             ast = node.addChild(new NodeData("Lval"));
             lval();
@@ -269,15 +290,7 @@ public class Descender {
 
     private void unaryExpr() {
         TreeNode<NodeData> node = ast;
-        if (curToken.equals("(") || curToken.isNumber() || curToken.isIdent()) {
-            ast = node.addChild(new NodeData("PrimaryExpr"));
-            primaryExpr();
-        } else if (curToken.equals("+") || curToken.equals("-")) {
-            ast = node.addChild(new NodeData("UnaryOp"));
-            unaryOp();
-            ast = node.addChild(new NodeData("UnaryExpr"));
-            unaryExpr();
-        } else if (curToken.isIdent()) {
+        if (curToken.isIdent() && tokens.get(tokenId).equals("(")) {
             ast = node.addChild(new NodeData(curToken));
             nextToken();
             if (curToken.equals("(")) {
@@ -295,6 +308,14 @@ public class Descender {
                     } else error();
                 }
             } else error();
+        } else if (curToken.equals("(") || curToken.isNumber() || curToken.isIdent()) {
+            ast = node.addChild(new NodeData("PrimaryExpr"));
+            primaryExpr();
+        } else if (curToken.equals("+") || curToken.equals("-")) {
+            ast = node.addChild(new NodeData("UnaryOp"));
+            unaryOp();
+            ast = node.addChild(new NodeData("UnaryExpr"));
+            unaryExpr();
         } else error();
     }
 
