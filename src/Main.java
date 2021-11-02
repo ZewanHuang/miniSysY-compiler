@@ -17,7 +17,7 @@ public class Main {
                     System.out.println("llvm");
                 }
                 case "-dump-ast" -> {
-                    System.out.println("ast");
+                    System.out.println(parser.dumpAST());
                 }
                 case "-dump-symbol-table" -> {
                     System.out.println("symbol-table");

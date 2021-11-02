@@ -1,6 +1,7 @@
 package compiler;
 
 import compiler.lexer.Scanner;
+import compiler.parser.Descender;
 
 public class Parser {
 
@@ -14,8 +15,19 @@ public class Parser {
         src = s;
     }
 
+    /**
+     * 生成 tokens
+     *
+     * @return tokens信息字符串
+     */
     public String dumpTokens() {
         Scanner scanner = new Scanner(src);
         return scanner.dumpTokens();
     }
+
+    public String dumpAST() {
+        Descender descender = new Descender(src);
+        return descender.buildAST().getTree();
+    }
+
 }

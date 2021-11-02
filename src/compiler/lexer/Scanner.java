@@ -27,6 +27,15 @@ public class Scanner {
     }
 
     /**
+     * 获取当前读文件头指针位置
+     *
+     * @return 头指针位置
+     */
+    public int getPtr() {
+        return ptr;
+    }
+
+    /**
      * 获取下一个字符并设置为字符判断器的属性
      */
     private void getChar() {
@@ -90,8 +99,8 @@ public class Scanner {
      * 获取下一个 token
      * @return token.value
      */
-    public String getToken() {
-        if (ptr >= src.length()-1)    return token.value;
+    public Token getToken() {
+        if (ptr >= src.length()-1)    return null;
 
         clearToken();
         getChar();
@@ -177,10 +186,8 @@ public class Scanner {
                     do { getCharWithCheck(); } while (newChar != '*');
                     do {
                         getCharWithCheck();
-                        if (newChar == '/') {
-                            getToken();
-                            return token.value;
-                        }
+                        if (newChar == '/')
+                            return getToken();
                     } while (newChar == '*');
                 } while (true);
             } else {
@@ -190,7 +197,7 @@ public class Scanner {
             }
         } else error();
 
-        return token.toString();
+        return token;
     }
 
     public String dumpTokens() {
