@@ -42,6 +42,8 @@ public class Analyzer {
             error();
         if (node.data.name.equals("Lval") && !isLvalValid(node))
             error();
+        if (node.data.name.equals("UnaryExpr") && node.children.size()>=3 && !isFuncCallValid(node))
+            error();
         if (node.data.name.equals("Block"))
             curBlockId++;
         register(node);
@@ -129,5 +131,26 @@ public class Analyzer {
             return item != null && item.iType == IdentType.VAL;
         else
             return item != null && (item.iType == IdentType.VAL || item.iType == IdentType.CONST);
+    }
+
+    /**
+     * 判断函数调用是否合法，即函数是否定义，以及参数是否正确
+     *
+     * @param node UnaryExp节点
+     * @return 是否合法
+     */
+    private boolean isFuncCallValid(TreeNode<NodeData> node) {
+        String ident = node.getChildAt(0).data.value;
+        // 判断函数是否定义
+        Item item = symTable.getItem(ident);
+        if (item == null || item.iType != IdentType.FUNC)
+            return false;
+        // 判断函数参数个数是否正确
+        int paramsCnt = node.children.size() == 3? 0 : node.getChildAt(2).children.size()/2+1;
+        if (item.funcParams.size() != paramsCnt)
+            return false;
+        // TODO:判断函数参数是否正确
+
+        return true;
     }
 }

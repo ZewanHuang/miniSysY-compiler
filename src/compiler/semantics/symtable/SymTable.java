@@ -7,6 +7,19 @@ public class SymTable {
 
     public SymTable() {
         symTable = new ArrayList<>();
+        initTable();
+    }
+
+    /**
+     * 初始化符号表，加入库函数
+     */
+    private void initTable() {
+        symTable.add(Item.GETCH);
+        symTable.add(Item.GETINT);
+        symTable.add(Item.GETARRAY);
+        symTable.add(Item.PUTINT);
+        symTable.add(Item.PUTARRAY);
+        symTable.add(Item.PUTCH);
     }
 
     /**

@@ -222,7 +222,6 @@ public class Descender {
     private void stmt() {
         TreeNode<NodeData> node = ast;
         if (curToken.isIdent() && tokens.get(tokenId).equals("=")) {
-            ast = node.addChild(new NodeData(curToken));
             ast = node.addChild(new NodeData("Lval"));
             lval();
             if (curToken.equals("=")) {
@@ -248,7 +247,6 @@ public class Descender {
                 nextToken();
             }
         } else {
-            nextToken();
             ast = node.addChild(new NodeData("Expr"));
             expr();
             if (curToken.equals(";")) {

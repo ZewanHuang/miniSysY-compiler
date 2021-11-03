@@ -3,6 +3,8 @@ package compiler;
 import compiler.lexer.Scanner;
 import compiler.lexer.Token;
 import compiler.parser.Descender;
+import compiler.parser.ast.NodeData;
+import compiler.parser.ast.TreeNode;
 import compiler.semantics.Analyzer;
 
 import java.util.ArrayList;
@@ -54,6 +56,18 @@ public class Parser {
         Descender descender = new Descender(tokens);
         Analyzer analyzer = new Analyzer(descender.buildAST());
         return analyzer.buildTable().toString();
+    }
+
+
+    public String dumpLLVM() {
+        Scanner scanner = new Scanner(src);
+        ArrayList<Token> tokens = scanner.dumpTokens();
+        tokens.add(new Token());
+        Descender descender = new Descender(tokens);
+        TreeNode<NodeData> ast = descender.buildAST();
+        Analyzer analyzer = new Analyzer(ast);
+        Generator generator = new Generator(ast, analyzer.buildTable());
+        return generator.generate();
     }
 
 }
