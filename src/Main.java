@@ -29,7 +29,7 @@ public class Main {
                         System.out.println(parser.dumpSymTable());
                 }
                 case "-llvm" -> {
-                    String outFile = (args.length >= 4 && args[2].equals("-o"))? args[3] : "case.ll";
+                    String outFile = (args.length >= 4 && args[2].equals("-o"))? args[3] : "debug/case.ll";
                     FileUtils.writeFile(outFile, parser.dumpLLVM());
                 }
                 case "-dump-answers" -> {

@@ -27,3 +27,6 @@ hs_err_pid*
 # test cases
 case*
 *.txt
+
+# debugger, such as tokens, AST, symbol table and so on
+debug/
