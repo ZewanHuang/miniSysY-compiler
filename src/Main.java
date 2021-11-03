@@ -11,13 +11,22 @@ public class Main {
 
             switch (args[0]) {
                 case "-dump-tokens" -> {
-                    System.out.println(parser.dumpTokens());
+                    if (args.length >= 4 && args[2].equals("-o"))
+                        FileUtils.writeFile(args[3], parser.dumpTokens());
+                    else
+                        System.out.println(parser.dumpTokens());
                 }
                 case "-dump-ast" -> {
-                    System.out.println(parser.dumpAST());
+                    if (args.length >= 4 && args[2].equals("-o"))
+                        FileUtils.writeFile(args[3], parser.dumpAST());
+                    else
+                        System.out.println(parser.dumpAST());
                 }
                 case "-dump-symbol-table" -> {
-                    System.out.println(parser.dumpSymTable());
+                    if (args.length >= 4 && args[2].equals("-o"))
+                        FileUtils.writeFile(args[3], parser.dumpSymTable());
+                    else
+                        System.out.println(parser.dumpSymTable());
                 }
                 case "-llvm" -> {
                     String outFile = (args.length >= 4 && args[2].equals("-o"))? args[3] : "case.ll";
