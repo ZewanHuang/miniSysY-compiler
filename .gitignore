@@ -30,3 +30,6 @@ case*
 
 # debugger, such as tokens, AST, symbol table and so on
 debug/
+
+# 实验报告
+*.pdf
