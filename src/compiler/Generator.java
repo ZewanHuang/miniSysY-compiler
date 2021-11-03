@@ -98,7 +98,7 @@ public class Generator {
         generate(node.getChildAt(2));
         product += "\nstore " + declItem.vType + " "
                 + node.getChildAt(2).data.value + ", "
-                + declItem.vType + "*" + decl;
+                + declItem.vType + "* " + decl;
     }
 
     private void genConstInitVal(TreeNode<NodeData> node) {
@@ -159,37 +159,35 @@ public class Generator {
     }
 
     private void genAddExpr(TreeNode<NodeData> node) {
-        int childCnt = node.children.size();
-        if (childCnt == 1) {
-            generate(node.getChildAt(0));
-            node.data.value = node.getChildAt(0).data.value;
-        } else if (childCnt == 3) {
-            generate(node.getChildAt(0));
-            generate(node.getChildAt(2));
-            node.data.value = "%" + (regId++);
-            product += node.data.value + " = "
-                    + flagOfOpera(node.getChildAt(1).data.value)
-                    + " i32 " + node.getChildAt(0).data.value
-                    + ", " + node.getChildAt(2).data.value + "\n";
+        generate(node.getChildAt(0));
+        String value_1 = node.getChildAt(0).data.value;
+        String value_2 = node.getChildAt(0).data.value;
+        for (int i = 2; i < node.children.size(); i+=2) {
+            generate(node.getChildAt(i));
+            value_2 = "%" + (regId++);
+            product += value_2 + " = "
+                    + flagOfOpera(node.getChildAt(i-1).data.value)
+                    + " i32 " + value_1
+                    + ", " + node.getChildAt(i).data.value + "\n";
+            value_1 = value_2;
         }
+        node.data.value = value_2;
     }
 
     private void genMulExpr(TreeNode<NodeData> node) {
-        switch (node.children.size()) {
-            case 1 -> {
-                generate(node.getChildAt(0));
-                node.data.value = node.getChildAt(0).data.value;
-            }
-            case 3 -> {
-                generate(node.getChildAt(0));
-                generate(node.getChildAt(2));
-                node.data.value = "%" + (regId++);
-                product += node.data.value + " = "
-                        + flagOfOpera(node.getChildAt(1).data.value)
-                        + " i32 " + node.getChildAt(0).data.value
-                        + ", " + node.getChildAt(2).data.value + "\n";
-            }
+        generate(node.getChildAt(0));
+        String value_1 = node.getChildAt(0).data.value;
+        String value_2 = node.getChildAt(0).data.value;
+        for (int i = 2; i < node.children.size(); i+=2) {
+            generate(node.getChildAt(i));
+            value_2 = "%" + (regId++);
+            product += value_2 + " = "
+                    + flagOfOpera(node.getChildAt(i-1).data.value)
+                    + " i32 " + value_1
+                    + ", " + node.getChildAt(i).data.value + "\n";
+            value_1 = value_2;
         }
+        node.data.value = value_2;
     }
 
     private void genUnaryExpr(TreeNode<NodeData> node) {
