@@ -333,7 +333,7 @@ public class Descender {
         } else if (curToken.equals("(") || curToken.isNumber() || curToken.isIdent()) {
             ast = node.addChild(new NodeData("PrimaryExpr"));
             primaryExpr();
-        } else if (curToken.equals("+") || curToken.equals("-")) {
+        } else if (curToken.equals("+") || curToken.equals("-") || curToken.equals("!")) {
             ast = node.addChild(new NodeData("UnaryOp"));
             unaryOp();
             ast = node.addChild(new NodeData("UnaryExpr"));
@@ -363,7 +363,7 @@ public class Descender {
 
     private void unaryOp() {
         TreeNode<NodeData> node = ast;
-        if (curToken.equals("+") || curToken.equals("-")) {
+        if (curToken.equals("+") || curToken.equals("-") || curToken.equals("!")) {
             ast = node.addChild(new NodeData(curToken));
             nextToken();
         } else error();

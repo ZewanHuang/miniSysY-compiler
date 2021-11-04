@@ -50,14 +50,14 @@ public class Generator {
             case "InitVal" -> genInitVal(node);
             case "Stmt" -> genStmt(node);
             case "Expr" -> genExpr(node);
-            case "AddExpr" -> genAddExpr(node);
-            case "MulExpr" -> genMulExpr(node);
+            case "AddExpr", "MulExpr" -> genOperaExpr(node);
             case "UnaryExpr" -> genUnaryExpr(node);
             case "PrimaryExpr" -> genPrimExpr(node);
             case "FuncRParams" -> genFuncRParams(node);
             case "Lval" -> genRLval(node);
             case "Cond" -> genCond(node);
-            case "RelExpr", "EqExpr", "LAndExpr", "LOrExpr" -> genCmpExpr(node);
+            case "RelExpr", "EqExpr" -> genCmpExpr(node);
+            case "LAndExpr", "LOrExpr" -> genLogicExpr(node);
             default -> {
                 for (TreeNode<NodeData> child : node.children)
                     generate(child);
@@ -153,14 +153,35 @@ public class Generator {
                         + ", label ";
                 int len = product.length();
                 int reg_1 = (regId++);
-                product += reg_1 + ":\n";
+                product += "\n" + reg_1 + ":\n";
                 generate(node.getChildAt(4));
                 int reg_2 = (regId++);
                 product += "br label %" + reg_2 + "\n";
-                product += reg_2 + ":\n";
+                product += "\n" + reg_2 + ":\n";
                 StringBuilder buffer = new StringBuilder(product);
                 product = buffer.insert(len,
                         "%" + reg_1 + ", label %" + reg_2 + "\n").toString();
+            }
+            case 7 -> {
+                generate(node.getChildAt(2));
+                product += "br i1 " + node.getChildAt(2).data.value + ", label ";
+                int len_1 = product.length();
+                int reg_1 = (regId++);
+                product += "\n" + reg_1 + ":\n";
+                generate(node.getChildAt(4));
+                int len_2 = product.length();
+                int reg_2 = (regId++);
+                product += "\n" + reg_2 + ":\n";
+                generate(node.getChildAt(6));
+                int reg_3 = (regId++);
+                product += "br label %" + reg_3 + "\n";
+                product += "\n" + reg_3 + ":\n";
+                StringBuilder buffer = new StringBuilder(product);
+                buffer.insert(len_2,
+                        "br label %" + reg_3 + "\n");
+                buffer.insert(len_1,
+                        "%" + reg_1 + ", label %" + reg_2 + "\n");
+                product = buffer.toString();
             }
         }
     }
@@ -177,23 +198,7 @@ public class Generator {
         node.data.value = node.getChildAt(0).data.value;
     }
 
-    private void genAddExpr(TreeNode<NodeData> node) {
-        generate(node.getChildAt(0));
-        String value_1 = node.getChildAt(0).data.value;
-        String value_2 = node.getChildAt(0).data.value;
-        for (int i = 2; i < node.children.size(); i+=2) {
-            generate(node.getChildAt(i));
-            value_2 = "%" + (regId++);
-            product += value_2 + " = "
-                    + flagOfOpera(node.getChildAt(i-1).data.value)
-                    + " i32 " + value_1
-                    + ", " + node.getChildAt(i).data.value + "\n";
-            value_1 = value_2;
-        }
-        node.data.value = value_2;
-    }
-
-    private void genMulExpr(TreeNode<NodeData> node) {
+    private void genOperaExpr(TreeNode<NodeData> node) {
         generate(node.getChildAt(0));
         String value_1 = node.getChildAt(0).data.value;
         String value_2 = node.getChildAt(0).data.value;
@@ -213,12 +218,35 @@ public class Generator {
         generate(node.getChildAt(0));
         String value_1 = node.getChildAt(0).data.value;
         String value_2 = node.getChildAt(0).data.value;
-        for (int i = 2; i < node.children.size(); i+=2) {
+        int childCnt = node.children.size();
+        if (childCnt == 1 && node.data.name.equals("RelExpr")) {
+            value_2 = "%" + (regId++);
+            product += value_2 + " = icmp ne i32 "
+                    + value_1
+                    + ", 0\n";
+        }
+        for (int i = 2; i < childCnt; i+=2) {
             generate(node.getChildAt(i));
             value_2 = "%" + (regId++);
             product += value_2 + " = icmp "
                     + flagOfOpera(node.getChildAt(i-1).data.value)
                     + " i32 " + value_1
+                    + ", " + node.getChildAt(i).data.value + "\n";
+            value_1 = value_2;
+        }
+        node.data.value = value_2;
+    }
+
+    private void genLogicExpr(TreeNode<NodeData> node) {
+        generate(node.getChildAt(0));
+        String value_1 = node.getChildAt(0).data.value;
+        String value_2 = node.getChildAt(0).data.value;
+        for (int i = 2; i < node.children.size(); i+=2) {
+            generate(node.getChildAt(i));
+            value_2 = "%" + (regId++);
+            product += value_2 + " = "
+                    + flagOfOpera(node.getChildAt(i-1).data.value)
+                    + " i1 " + value_1
                     + ", " + node.getChildAt(i).data.value + "\n";
             value_1 = value_2;
         }
@@ -234,10 +262,24 @@ public class Generator {
             case 2 -> {
                 genUnaryExpr(node.getChildAt(1));
                 node.data.value = "%" + (regId++);
-                product += node.data.value + " = "
-                        + flagOfOpera(node.getChildAt(0).getChildAt(0).data.value)
-                        + " i32 0, "
-                        + node.getChildAt(1).data.value + "\n";
+                String opera = node.getChildAt(0).getChildAt(0).data.value;
+                switch (opera) {
+                    case "+", "-" -> {
+                        product += node.data.value + " = "
+                                + flagOfOpera(opera)
+                                + " i32 0, "
+                                + node.getChildAt(1).data.value + "\n";
+                    }
+                    case "!" -> {
+                        product += node.data.value + " = icmp eq i32 0, "
+                                + node.getChildAt(1).data.value + "\n";
+                        String newValue = "%" + (regId++);
+                        product += newValue + " = zext i1 "
+                                + node.data.value
+                                + " to i32\n";
+                        node.data.value = newValue;
+                    }
+                }
             }
             case 3 -> {
                 String funcName = node.getChildAt(0).data.value;
