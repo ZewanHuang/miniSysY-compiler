@@ -57,6 +57,7 @@ public class Generator {
             case "PrimaryExpr" -> genPrimExpr(node);
             case "FuncRParams" -> genFuncRParams(node);
             case "Lval" -> genRLval(node);
+            case "RelExpr", "EqExpr", "LAndExpr", "LOrExpr" -> genCmpExpr(node);
             default -> {
                 for (TreeNode<NodeData> child : node.children)
                     generate(child);
@@ -190,6 +191,22 @@ public class Generator {
         node.data.value = value_2;
     }
 
+    private void genCmpExpr(TreeNode<NodeData> node) {
+        generate(node.getChildAt(0));
+        String value_1 = node.getChildAt(0).data.value;
+        String value_2 = node.getChildAt(0).data.value;
+        for (int i = 2; i < node.children.size(); i+=2) {
+            generate(node.getChildAt(i));
+            value_2 = "%" + (regId++);
+            product += value_2 + " = icmp "
+                    + flagOfOpera(node.getChildAt(i-1).data.value)
+                    + " i32 " + value_1
+                    + ", " + node.getChildAt(i).data.value + "\n";
+            value_1 = value_2;
+        }
+        node.data.value = value_2;
+    }
+
     private void genUnaryExpr(TreeNode<NodeData> node) {
         switch (node.children.size()) {
             case 1 -> {
@@ -285,6 +302,14 @@ public class Generator {
             case "*" -> "mul";
             case "/" -> "sdiv";
             case "%" -> "srem";
+            case "<" -> "slt";
+            case ">" -> "sgt";
+            case "<=" -> "sle";
+            case ">=" -> "sge";
+            case "==" -> "eq";
+            case "!=" -> "ne";
+            case "&&" -> "and";
+            case "||" -> "or";
             default -> "error";
         };
     }

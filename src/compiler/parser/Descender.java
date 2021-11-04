@@ -221,7 +221,10 @@ public class Descender {
 
     private void stmt() {
         TreeNode<NodeData> node = ast;
-        if (curToken.isIdent() && tokens.get(tokenId).equals("=")) {
+        if (curToken.equals("{")) {
+            ast = node.addChild(new NodeData("Block"));
+            block();
+        } else if (curToken.isIdent() && tokens.get(tokenId).equals("=")) {
             ast = node.addChild(new NodeData("Lval"));
             lval();
             if (curToken.equals("=")) {
@@ -246,6 +249,27 @@ public class Descender {
                 ast = node.addChild(new NodeData(curToken));
                 nextToken();
             }
+        } else if (curToken.equals("if")) {
+            ast = node.addChild(new NodeData(curToken));
+            nextToken();
+            if (curToken.equals("(")) {
+                ast = node.addChild(new NodeData(curToken));
+                nextToken();
+                ast = node.addChild(new NodeData("Cond"));
+                cond();
+                if (curToken.equals(")")) {
+                    ast = node.addChild(new NodeData(curToken));
+                    nextToken();
+                    ast = node.addChild(new NodeData("Stmt"));
+                    stmt();
+                    if (curToken.equals("else")) {
+                        ast = node.addChild(new NodeData(curToken));
+                        nextToken();
+                        ast = node.addChild(new NodeData("Stmt"));
+                        stmt();
+                    }
+                } else error();
+            } else error();
         } else {
             ast = node.addChild(new NodeData("Expr"));
             expr();
@@ -363,5 +387,59 @@ public class Descender {
             ast = node.addChild(new NodeData(curToken));
             nextToken();
         } else error();
+    }
+
+    private void cond() {
+        TreeNode<NodeData> node = ast;
+        ast = node.addChild(new NodeData("LOrExpr"));
+        lOrExpr();
+    }
+
+    private void relExpr() {
+        TreeNode<NodeData> node = ast;
+        ast = node.addChild(new NodeData("AddExpr"));
+        addExpr();
+        while (curToken.equals(">") || curToken.equals("<") || curToken.equals("<=") || curToken.equals(">=")) {
+            ast = node.addChild(new NodeData(curToken));
+            nextToken();
+            ast = node.addChild(new NodeData("AddExpr"));
+            addExpr();
+        }
+    }
+
+    private void eqExpr() {
+        TreeNode<NodeData> node = ast;
+        ast = node.addChild(new NodeData("RelExpr"));
+        relExpr();
+        while (curToken.equals("==") || curToken.equals("!=")) {
+            ast = node.addChild(new NodeData(curToken));
+            nextToken();
+            ast = node.addChild(new NodeData("RelExpr"));
+            relExpr();
+        }
+    }
+
+    private void lAndExpr() {
+        TreeNode<NodeData> node = ast;
+        ast = node.addChild(new NodeData("EqExpr"));
+        eqExpr();
+        while (curToken.equals("&&")) {
+            ast = node.addChild(new NodeData(curToken));
+            nextToken();
+            ast = node.addChild(new NodeData("EqExpr"));
+            eqExpr();
+        }
+    }
+
+    private void lOrExpr() {
+        TreeNode<NodeData> node = ast;
+        ast = node.addChild(new NodeData("LAndExpr"));
+        lAndExpr();
+        while (curToken.equals("||")) {
+            ast = node.addChild(new NodeData(curToken));
+            nextToken();
+            ast = node.addChild(new NodeData("LAndExpr"));
+            lAndExpr();
+        }
     }
 }

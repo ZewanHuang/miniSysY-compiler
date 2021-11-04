@@ -189,9 +189,13 @@ public class Scanner {
             } else {
                 token.symbol = "Gt";
             }
-        } else if (newChar == '!' && src.charAt(ptr) == '=') {
+        } else if (newChar == '!') {
             catToken();
-            getChar(); catToken(); token.symbol = "Neq";
+            if (src.charAt(ptr) == '=') {
+                getChar(); catToken(); token.symbol = "Neq";
+            } else {
+                token.symbol = "Not";
+            }
         } else if (newChar == '&' && src.charAt(ptr) == '&') {
             catToken();
             getChar(); catToken(); token.symbol = "And";
