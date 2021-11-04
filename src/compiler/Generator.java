@@ -156,7 +156,8 @@ public class Generator {
                 product += "\n" + reg_1 + ":\n";
                 generate(node.getChildAt(4));
                 int reg_2 = (regId++);
-                product += "br label %" + reg_2 + "\n";
+                if (!hasRet())
+                    product += "br label %" + reg_2 + "\n";
                 product += "\n" + reg_2 + ":\n";
                 StringBuilder buffer = new StringBuilder(product);
                 product = buffer.insert(len,
@@ -174,11 +175,13 @@ public class Generator {
                 product += "\n" + reg_2 + ":\n";
                 generate(node.getChildAt(6));
                 int reg_3 = (regId++);
-                product += "br label %" + reg_3 + "\n";
+                if (!hasRet())
+                    product += "br label %" + reg_3 + "\n";
                 product += "\n" + reg_3 + ":\n";
                 StringBuilder buffer = new StringBuilder(product);
-                buffer.insert(len_2,
-                        "br label %" + reg_3 + "\n");
+                if (!hasRet(len_2))
+                    buffer.insert(len_2,
+                            "br label %" + reg_3 + "\n");
                 buffer.insert(len_1,
                         "%" + reg_1 + ", label %" + reg_2 + "\n");
                 product = buffer.toString();
@@ -372,6 +375,27 @@ public class Generator {
             case "||" -> "or";
             default -> "error";
         };
+    }
+
+    /**
+     * 判断product字符串前length个字符的子串是否以ret结束
+     *
+     * @param length 前length个字符
+     * @return 是否以ret结束
+     */
+    private boolean hasRet(int length) {
+        String[] array = product.substring(0,length).split("\n");
+        return array[array.length-1].startsWith("ret");
+    }
+
+    /**
+     * 判断product字符串是否以ret结束
+     *
+     * @return 是否以ret结束
+     */
+    private boolean hasRet() {
+        String[] array = product.split("\n");
+        return array[array.length-1].startsWith("ret");
     }
 
 }
