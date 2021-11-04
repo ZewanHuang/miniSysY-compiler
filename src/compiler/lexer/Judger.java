@@ -11,7 +11,7 @@ public class Judger {
     }
 
     public static final String[] REVERSER = {
-            "if", "else", "while", "break", "continue", "return", "int", "void"
+            "if", "else", "while", "break", "continue", "return", "int", "void", "const"
     };
     public boolean isReversed(String str) {
         return Arrays.asList(REVERSER).contains(str);

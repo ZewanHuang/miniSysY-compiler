@@ -144,14 +144,6 @@ public class Scanner {
                 retract();
                 token.symbol = "Number";
             } else error();
-        } else if (newChar == '=') {
-            catToken();
-            getChar();
-            if (newChar == '=') {
-                catToken(); token.symbol = "Eq";
-            } else {
-                token.symbol = "Assign"; retract();
-            }
         } else if (newChar == ';') {
             catToken(); token.symbol = "Semicolon";
         } else if (newChar == ',') {
@@ -164,6 +156,10 @@ public class Scanner {
             catToken(); token.symbol = "LBrace";
         } else if (newChar == '}') {
             catToken(); token.symbol = "RBrace";
+        } else if (newChar == '[') {
+            catToken(); token.symbol = "LBracket";
+        } else if (newChar == ']') {
+            catToken(); token.symbol = "RBracket";
         } else if (newChar == '+') {
             catToken(); token.symbol = "Plus";
         } else if (newChar == '-') {
@@ -172,10 +168,36 @@ public class Scanner {
             catToken(); token.symbol = "Mult";
         } else if (newChar == '%') {
             catToken(); token.symbol = "Mod";
+        } else if (newChar == '=') {
+            catToken();
+            if (src.charAt(ptr) == '=') {
+                getChar(); catToken(); token.symbol = "Eq";
+            } else {
+                token.symbol = "Assign";
+            }
         } else if (newChar == '<') {
-            catToken(); token.symbol = "Lt";
+            catToken();
+            if (src.charAt(ptr) == '=') {
+                getChar(); catToken(); token.symbol = "Leq";
+            } else {
+                token.symbol = "Lt";
+            }
         } else if (newChar == '>') {
-            catToken(); token.symbol = "Gt";
+            catToken();
+            if (src.charAt(ptr) == '=') {
+                getChar(); catToken(); token.symbol = "Geq";
+            } else {
+                token.symbol = "Gt";
+            }
+        } else if (newChar == '!' && src.charAt(ptr) == '=') {
+            catToken();
+            getChar(); catToken(); token.symbol = "Neq";
+        } else if (newChar == '&' && src.charAt(ptr) == '&') {
+            catToken();
+            getChar(); catToken(); token.symbol = "And";
+        } else if (newChar == '|' && src.charAt(ptr) == '|') {
+            catToken();
+            getChar(); catToken(); token.symbol = "Or";
         } else if (newChar == '/') {
             getChar();
             if (newChar == '/') {
