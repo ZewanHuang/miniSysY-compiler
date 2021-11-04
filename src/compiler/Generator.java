@@ -43,7 +43,6 @@ public class Generator {
         switch (node.data.name) {
             case "FuncDef" -> genFuncDef(node);
             case "Block" -> genBlock(node);
-            case "BlockItem" -> genBlockItem(node);
             case "ConstDef" -> genConstDef(node);
             case "ConstInitVal" -> genConstInitVal(node);
             case "ConstExp" -> genConstExp(node);
@@ -57,6 +56,7 @@ public class Generator {
             case "PrimaryExpr" -> genPrimExpr(node);
             case "FuncRParams" -> genFuncRParams(node);
             case "Lval" -> genRLval(node);
+            case "Cond" -> genCond(node);
             case "RelExpr", "EqExpr", "LAndExpr", "LOrExpr" -> genCmpExpr(node);
             default -> {
                 for (TreeNode<NodeData> child : node.children)
@@ -73,21 +73,15 @@ public class Generator {
     private void genFuncDef(TreeNode<NodeData> node) {
         String funcName = node.getChildAt(1).data.value;
         Item funcItem = symTable.getItem(funcName);
-        product += "define dso_local " + funcItem.vType + " @" + funcName + "()";
+        product += "define dso_local " + funcItem.vType + " @" + funcName + "() {\n";
         generate(node.getChildAt(4));
+        product += "}";
     }
 
     private void genBlock(TreeNode<NodeData> node) {
-        product += " {\n";
         int i = 1;
         while (i <= node.children.size()-2)
             generate(node.getChildAt(i++));
-        product += "\n}";
-    }
-
-    private void genBlockItem(TreeNode<NodeData> node) {
-        generate(node.getChildAt(0));
-        product += "\n";
     }
 
     private void genConstDef(TreeNode<NodeData> node) {
@@ -95,11 +89,11 @@ public class Generator {
         Item declItem = symTable.getItem(declName);
         declItem.regId = regId;
         String decl = "%" + (regId++);
-        product += "\n" + decl + " = alloca " + declItem.vType + "\n";
+        product += decl + " = alloca " + declItem.vType + "\n";
         generate(node.getChildAt(2));
-        product += "\nstore " + declItem.vType + " "
+        product += "store " + declItem.vType + " "
                 + node.getChildAt(2).data.value + ", "
-                + declItem.vType + "* " + decl;
+                + declItem.vType + "* " + decl + "\n";
     }
 
     private void genConstInitVal(TreeNode<NodeData> node) {
@@ -117,13 +111,13 @@ public class Generator {
         Item declItem = symTable.getItem(declName);
         declItem.regId = regId;
         String decl = "%" + (regId++);
-        product += "\n" + decl + " = alloca " + declItem.vType + "\n";
+        product += decl + " = alloca " + declItem.vType + "\n";
 
         if (node.children.size() >= 3) {
             generate(node.getChildAt(2));
-            product += "\nstore " + declItem.vType + " "
+            product += "store " + declItem.vType + " "
                     + node.getChildAt(2).data.value + ", "
-                    + declItem.vType + "* " + decl;
+                    + declItem.vType + "* " + decl + "\n";
         }
     }
 
@@ -134,6 +128,9 @@ public class Generator {
 
     private void genStmt(TreeNode<NodeData> node) {
         switch (node.children.size()) {
+            case 1 -> {
+                generate(node.getChildAt(0));
+            }
             case 2 -> {
                 generate(node.getChildAt(0));
                 node.data.value = node.getChildAt(0).data.value;
@@ -146,11 +143,32 @@ public class Generator {
                 String val = node.getLeaves().get(0).data.value;
                 Item valItem = symTable.getItem(val);
                 generate(node.getChildAt(2));
-                product += "\nstore " + valItem.vType + " "
+                product += "store " + valItem.vType + " "
                         + node.getChildAt(2).data.value + ", "
-                        + valItem.vType + "* " + "%" + valItem.regId;
+                        + valItem.vType + "* " + "%" + valItem.regId + "\n";
+            }
+            case 5 -> {
+                generate(node.getChildAt(2));
+                product += "br i1 " + node.getChildAt(2).data.value
+                        + ", label ";
+                int len = product.length();
+                int reg_1 = (regId++);
+                product += reg_1 + ":\n";
+                generate(node.getChildAt(4));
+                int reg_2 = (regId++);
+                product += "br label %" + reg_2 + "\n";
+                product += reg_2 + ":\n";
+                StringBuilder buffer = new StringBuilder(product);
+                product = buffer.insert(len,
+                        "%" + reg_1 + ", label %" + reg_2 + "\n").toString();
             }
         }
+    }
+
+    private void genCond(TreeNode<NodeData> node) {
+        for (TreeNode<NodeData> child : node.children)
+            generate(child);
+        node.data.value = node.getChildAt(0).data.value;
     }
 
     private void genExpr(TreeNode<NodeData> node) {
@@ -232,7 +250,7 @@ public class Generator {
                 product += "call " + funcItem.vType.toString()
                         + " @" + funcName
                         + "("
-                        + ")";
+                        + ")\n";
             }
             case 4 -> {
                 String funcName = node.getChildAt(0).data.value;
@@ -247,7 +265,7 @@ public class Generator {
                         + " @" + funcName
                         + "("
                         + node.getChildAt(2).data.value
-                        + ")";
+                        + ")\n";
             }
         }
     }
