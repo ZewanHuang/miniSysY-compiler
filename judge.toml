@@ -19,5 +19,5 @@ run = [
 [jobs.lab4]
 image = { source = "dockerfile", path = ".", tag = "lab4" }
 run = [
-    "java Main -dump-answers $input -o $ir",
+    "java Main -llvm $input -o $ir",
 ]
