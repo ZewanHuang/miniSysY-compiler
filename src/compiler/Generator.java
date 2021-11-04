@@ -219,7 +219,7 @@ public class Generator {
         String value_1 = node.getChildAt(0).data.value;
         String value_2 = node.getChildAt(0).data.value;
         int childCnt = node.children.size();
-        if (childCnt == 1 && node.data.name.equals("RelExpr")) {
+        if (childCnt == 1 && node.data.name.equals("RelExpr") && node.parent.children.size() == 1) {
             value_2 = "%" + (regId++);
             product += value_2 + " = icmp ne i32 "
                     + value_1
