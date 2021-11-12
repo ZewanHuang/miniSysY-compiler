@@ -65,8 +65,8 @@ public class Parser {
         tokens.add(new Token());
         Descender descender = new Descender(tokens);
         TreeNode<NodeData> ast = descender.buildAST();
-        Analyzer analyzer = new Analyzer(ast);
-        Generator generator = new Generator(ast, analyzer.buildTable());
+        new Analyzer(ast).buildTable();
+        Generator generator = new Generator(ast);
         return generator.generate();
     }
 

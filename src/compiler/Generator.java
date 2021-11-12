@@ -2,19 +2,26 @@ package compiler;
 
 import compiler.parser.ast.NodeData;
 import compiler.parser.ast.TreeNode;
+import compiler.semantics.Analyzer;
 import compiler.semantics.symtable.Item;
 import compiler.semantics.symtable.SymTable;
+
+import java.util.Stack;
 
 public class Generator {
 
     private TreeNode<NodeData> ast;
-    private SymTable symTable;
     private int regId;
     private String product;
 
-    public Generator(TreeNode<NodeData> tree, SymTable symTable) {
+    /**
+     * 在生成器中，需要边遍历边填入新符号表
+     */
+    private SymTable symTable;
+    private Analyzer analyzer;
+
+    public Generator(TreeNode<NodeData> tree) {
         this.ast = tree;
-        this.symTable = symTable;
         this.regId = 1;
         this.product = """
                 declare i32 @getint()
@@ -22,6 +29,8 @@ public class Generator {
                 declare i32 @getch()
                 declare void @putch(i32)
                 """;
+        this.symTable = new SymTable();
+        this.analyzer = new Analyzer(ast, symTable);
     }
 
     /**
@@ -40,6 +49,8 @@ public class Generator {
      * @param node 节点
      */
     private void generate(TreeNode<NodeData> node) {
+        analyzer.handleBlock(node);
+        analyzer.register(node);
         switch (node.data.name) {
             case "FuncDef" -> genFuncDef(node);
             case "Block" -> genBlock(node);
@@ -79,9 +90,8 @@ public class Generator {
     }
 
     private void genBlock(TreeNode<NodeData> node) {
-        int i = 1;
-        while (i <= node.children.size()-2)
-            generate(node.getChildAt(i++));
+        for (TreeNode<NodeData> child : node.children)
+            generate(child);
     }
 
     private void genConstDef(TreeNode<NodeData> node) {

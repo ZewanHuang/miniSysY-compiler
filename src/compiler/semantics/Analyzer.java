@@ -7,6 +7,8 @@ import compiler.semantics.symtable.Item.ValueType;
 import compiler.semantics.symtable.Item.IdentType;
 import compiler.semantics.symtable.SymTable;
 
+import java.util.Stack;
+
 import static compiler.exception.CompileException.error;
 
 public class Analyzer {
@@ -16,10 +18,18 @@ public class Analyzer {
 
     private int curBlockId;
 
-    public Analyzer(TreeNode<NodeData> tree) {
+    public Stack<Integer> blockStack;
+
+    public Analyzer(TreeNode<NodeData> tree, SymTable symTable) {
         this.ast = tree.getRoot();
-        this.symTable = new SymTable();
+        this.symTable = symTable;
         this.curBlockId = 0;
+        this.blockStack = new Stack<>();
+        this.blockStack.push(0);
+    }
+
+    public Analyzer(TreeNode<NodeData> tree) {
+        this(tree, new SymTable());
     }
 
     /**
@@ -44,11 +54,29 @@ public class Analyzer {
             error();
         if (node.data.name.equals("UnaryExpr") && node.children.size()>=3 && !isFuncCallValid(node))
             error();
-        if (node.data.name.equals("Block"))
-            curBlockId++;
+
+        handleBlock(node);
         register(node);
         for (TreeNode<NodeData> child : node.children)
             traversal(child);
+    }
+
+    /**
+     * 进入 block 时 blockId 加一，退出时符号置为无效，blockId 减一
+     *
+     * @param node 语法树的当前节点
+     */
+    public void handleBlock(TreeNode<NodeData> node) {
+        if (node.parent != null && node.parent.data.name.equals("Block")) {
+            if (node.data.value.equals("{")) {
+                curBlockId++;
+                blockStack.push(curBlockId);
+            } else if (node.data.value.equals("}")) {
+                symTable.setBlockInvalid(curBlockId);
+                blockStack.pop();
+                curBlockId = blockStack.peek();
+            }
+        }
     }
 
     /**
@@ -56,31 +84,32 @@ public class Analyzer {
      *
      * @param node 语法树的当前节点
      */
-    private void register(TreeNode<NodeData> node) {
-        if (!node.data.name.equals("Ident"))
-            return;
-        TreeNode<NodeData> parent = node.parent;
-        switch (parent.data.name) {
+    public void register(TreeNode<NodeData> node) {
+        TreeNode<NodeData> ident;
+        switch (node.data.name) {
             case "FuncDef" -> {
+                ident = node.getChildAt(1);
                 Item.ValueType vtype;
-                if (parent.getChildAt(0).getChildAt(0).data.name.equals("Int"))
+                if (node.getChildAt(0).getChildAt(0).data.name.equals("Int"))
                     vtype = Item.ValueType.INT;
                 else
                     vtype = Item.ValueType.VOID;
-                symTable.insert(node.data.value, curBlockId, IdentType.FUNC, vtype);
+                symTable.insert(ident.data.value, curBlockId, IdentType.FUNC, vtype);
             }
             case "ConstDef" -> {
-                if (!symTable.isAvailDecl(node.data.value, curBlockId)) // 若同区块内该变量名被用，则报错
+                ident = node.getChildAt(0);
+                if (!symTable.isAvailDecl(ident.data.value, curBlockId)) // 若同区块内该变量名被用，则报错
                     error();
-                Item item = symTable.insert(node.data.value, curBlockId, IdentType.CONST, Item.ValueType.INT);
-                if (parent.children.size() == 3 && hasCerVal(parent.getChildAt(2))) // 查询其叶子节点判断是否有值
+                Item item = symTable.insert(ident.data.value, curBlockId, IdentType.CONST, Item.ValueType.INT);
+                if (node.children.size() == 3 && hasCerVal(node.getChildAt(2))) // 查询其叶子节点判断是否有值
                     item.hasCerVal = true;
             }
             case "VarDef" -> {
-                if (!symTable.isAvailDecl(node.data.value, curBlockId))
+                ident = node.getChildAt(0);
+                if (!symTable.isAvailDecl(ident.data.value, curBlockId))
                     error();
-                Item item = symTable.insert(node.data.value, curBlockId, IdentType.VAL, Item.ValueType.INT);
-                if (parent.children.size() == 3 && hasCerVal(parent.getChildAt(2)))
+                Item item = symTable.insert(ident.data.value, curBlockId, IdentType.VAL, Item.ValueType.INT);
+                if (node.children.size() == 3 && hasCerVal(node.getChildAt(2)))
                     item.hasCerVal = true;
             }
         }
@@ -92,7 +121,7 @@ public class Analyzer {
      * @param node 节点
      * @return 是否有确定值
      */
-    private boolean hasCerVal(TreeNode<NodeData> node) {
+    public boolean hasCerVal(TreeNode<NodeData> node) {
         for (TreeNode<NodeData> leaf : node.getLeaves())
             if (leaf.data.name.equals("Ident")) {
                 Item item = symTable.getItem(leaf.data.value);
@@ -108,7 +137,7 @@ public class Analyzer {
      * @param node ConstInitVal节点
      * @return 是否满足
      */
-    private boolean isConstInitVal(TreeNode<NodeData> node) {
+    public boolean isConstInitVal(TreeNode<NodeData> node) {
         for (TreeNode<NodeData> leaf : node.getLeaves())
             if (leaf.data.name.equals("Ident")) {
                 Item item = symTable.getItem(leaf.data.value);
@@ -124,7 +153,7 @@ public class Analyzer {
      * @param node Lval节点
      * @return 是否符合语义
      */
-    private boolean isLvalValid(TreeNode<NodeData> node) {
+    public boolean isLvalValid(TreeNode<NodeData> node) {
         String ident = node.getChildAt(0).data.value;
         Item item = symTable.getItem(ident);
         if (node.parent.data.name.equals("Stmt"))
@@ -139,7 +168,7 @@ public class Analyzer {
      * @param node UnaryExp节点
      * @return 是否合法
      */
-    private boolean isFuncCallValid(TreeNode<NodeData> node) {
+    public boolean isFuncCallValid(TreeNode<NodeData> node) {
         String ident = node.getChildAt(0).data.value;
         // 判断函数是否定义
         Item item = symTable.getItem(ident);

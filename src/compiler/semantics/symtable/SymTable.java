@@ -1,6 +1,7 @@
 package compiler.semantics.symtable;
 
 import java.util.ArrayList;
+import java.util.Stack;
 
 public class SymTable {
     public ArrayList<Item> symTable;
@@ -29,7 +30,7 @@ public class SymTable {
      */
     public String toString() {
         StringBuilder table = new StringBuilder();
-        table.append(String.format("%15s %10s %10s %12s %10s\n", "name", "iType", "vType", "hasCerVal", "blockId"));
+        table.append(String.format("%15s %10s %10s %12s %10s %10s\n", "name", "iType", "vType", "hasCerVal", "blockId", "isValid"));
         for (Item item : symTable)
             table.append(item.toString()).append("\n");
         return table.toString();
@@ -69,8 +70,10 @@ public class SymTable {
         Item item = null;
         for (int i=symTable.size()-1; i>=0; i--) {
             Item temp = symTable.get(i);
-            if (temp.name.equals(name) && temp.isValid)
+            if (temp.name.equals(name) && temp.isValid) {
                 item = temp;
+                break;
+            }
         }
         return item;
     }
@@ -78,6 +81,23 @@ public class SymTable {
     public boolean isAvailDecl(String name, int curBlockId) {
         Item item = getItem(name);
         return item == null || item.blockId != curBlockId;
+    }
+
+    /**
+     * 将作用域ID为 blockId 的变量定义设置为无效
+     *
+     * @param blockId 作用域ID
+     */
+    public void setBlockInvalid(int blockId) {
+        for (Item item : symTable)
+            if (item.blockId == blockId)
+                item.isValid = false;
+    }
+
+    public void setBlockValid(int blockId) {
+        for (Item item : symTable)
+            if (item.blockId == blockId)
+                item.isValid = true;
     }
 
     /**
