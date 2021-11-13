@@ -16,7 +16,7 @@ public class Analyzer {
     private final TreeNode<NodeData> ast;
     private final SymTable symTable;
 
-    private int curBlockId;
+    public int curBlockId;
 
     public Stack<Integer> blockStack;
 
@@ -54,6 +54,13 @@ public class Analyzer {
             error();
         if (node.data.name.equals("UnaryExpr") && node.children.size()>=3 && !isFuncCallValid(node))
             error();
+        if (node.data.name.equals("InitVal")) {     // 全局变量也要求 InitVal 为常量表达式
+            TreeNode<NodeData> parent = node;
+            while (!parent.data.name.equals("VarDef"))
+                parent = node.parent;
+            if (symTable.getItem(parent.getChildAt(0).data.value).blockId == 0 && !isConstInitVal(node))
+                error();
+        }
 
         handleBlock(node);
         register(node);
@@ -89,6 +96,8 @@ public class Analyzer {
         switch (node.data.name) {
             case "FuncDef" -> {
                 ident = node.getChildAt(1);
+                if (!symTable.isAvailDecl(ident.data.value, curBlockId)) // 若同区块内该变量名被用，则报错
+                    error();
                 Item.ValueType vtype;
                 if (node.getChildAt(0).getChildAt(0).data.name.equals("Int"))
                     vtype = Item.ValueType.INT;
@@ -101,7 +110,8 @@ public class Analyzer {
                 if (!symTable.isAvailDecl(ident.data.value, curBlockId)) // 若同区块内该变量名被用，则报错
                     error();
                 Item item = symTable.insert(ident.data.value, curBlockId, IdentType.CONST, Item.ValueType.INT);
-                if (node.children.size() == 3 && hasCerVal(node.getChildAt(2))) // 查询其叶子节点判断是否有值
+                // 查询其叶子节点判断是否有值，若为全局变量则一定有初始化值
+                if (node.children.size() == 3 && hasCerVal(node.getChildAt(2)) || curBlockId == 0)
                     item.hasCerVal = true;
             }
             case "VarDef" -> {
@@ -109,7 +119,7 @@ public class Analyzer {
                 if (!symTable.isAvailDecl(ident.data.value, curBlockId))
                     error();
                 Item item = symTable.insert(ident.data.value, curBlockId, IdentType.VAL, Item.ValueType.INT);
-                if (node.children.size() == 3 && hasCerVal(node.getChildAt(2)))
+                if (node.children.size() == 3 && hasCerVal(node.getChildAt(2)) || curBlockId == 0)
                     item.hasCerVal = true;
             }
         }

@@ -37,6 +37,7 @@ public class Item {
     public ValueType vType;                 /* 标识符值类型 */
     public ArrayList<String> funcParams;    /* 函数参数列表 */
     public int regId;                       /* 寄存器ID */
+    public Integer intValue;                /* 编译时可求值 */
 
     public Item(String name, int blockId , IdentType iType, ValueType vType) {
         this.name = name;

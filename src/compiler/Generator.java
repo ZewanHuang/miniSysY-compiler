@@ -6,7 +6,6 @@ import compiler.semantics.Analyzer;
 import compiler.semantics.symtable.Item;
 import compiler.semantics.symtable.SymTable;
 
-import java.util.Stack;
 
 public class Generator {
 
@@ -97,43 +96,68 @@ public class Generator {
     private void genConstDef(TreeNode<NodeData> node) {
         String declName = node.getChildAt(0).data.value;
         Item declItem = symTable.getItem(declName);
-        declItem.regId = regId;
-        String decl = "%" + (regId++);
-        product += decl + " = alloca " + declItem.vType + "\n";
-        generate(node.getChildAt(2));
-        product += "store " + declItem.vType + " "
-                + node.getChildAt(2).data.value + ", "
-                + declItem.vType + "* " + decl + "\n";
+        // 全局变量求值，局部变量声明不求值
+        if (declItem.blockId == 0) {
+            generate(node.getChildAt(2));
+            product += "@" + declName + " = dso_local global i32 "
+                    + node.getChildAt(2).data.intValue + "\n";
+        } else {
+            declItem.regId = regId;
+            String decl = "%" + (regId++);
+            product += decl + " = alloca " + declItem.vType + "\n";
+            generate(node.getChildAt(2));
+            product += "store " + declItem.vType + " "
+                    + node.getChildAt(2).data.value + ", "
+                    + declItem.vType + "* " + decl + "\n";
+        }
+        declItem.intValue = node.getChildAt(2).data.intValue;
     }
 
     private void genConstInitVal(TreeNode<NodeData> node) {
         generate(node.getChildAt(0));
         node.data.value = node.getChildAt(0).data.value;
+        node.data.intValue = node.getChildAt(0).data.intValue;
     }
 
     private void genConstExp(TreeNode<NodeData> node) {
         generate(node.getChildAt(0));
         node.data.value = node.getChildAt(0).data.value;
+        node.data.intValue = node.getChildAt(0).data.intValue;
     }
 
     private void genVarDef(TreeNode<NodeData> node) {
         String declName = node.getChildAt(0).data.value;
         Item declItem = symTable.getItem(declName);
-        declItem.regId = regId;
-        String decl = "%" + (regId++);
-        product += decl + " = alloca " + declItem.vType + "\n";
 
-        if (node.children.size() >= 3) {
-            generate(node.getChildAt(2));
-            product += "store " + declItem.vType + " "
-                    + node.getChildAt(2).data.value + ", "
-                    + declItem.vType + "* " + decl + "\n";
+        if (declItem.blockId == 0) {
+            if (node.children.size() == 0) {
+                product += "@" + declName + " = dso_local global i32 0\n";
+                declItem.intValue = 0;
+            } else {
+                generate(node.getChildAt(2));
+                product += "@" + declName + " = dso_local global i32 "
+                        + node.getChildAt(2).data.intValue + "\n";
+                declItem.intValue = node.getChildAt(2).data.intValue;
+            }
+        } else {
+            declItem.regId = regId;
+            String decl = "%" + (regId++);
+            product += decl + " = alloca " + declItem.vType + "\n";
+
+            if (node.children.size() >= 3) {
+                generate(node.getChildAt(2));
+                product += "store " + declItem.vType + " "
+                        + node.getChildAt(2).data.value + ", "
+                        + declItem.vType + "* " + decl + "\n";
+                declItem.intValue = node.getChildAt(2).data.intValue;
+            }
         }
     }
 
     private void genInitVal(TreeNode<NodeData> node) {
         generate(node.getChildAt(0));
         node.data.value = node.getChildAt(0).data.value;
+        node.data.intValue = node.getChildAt(0).data.intValue;
     }
 
     private void genStmt(TreeNode<NodeData> node) {
@@ -144,6 +168,7 @@ public class Generator {
             case 2 -> {
                 generate(node.getChildAt(0));
                 node.data.value = node.getChildAt(0).data.value;
+                node.data.intValue = node.getChildAt(0).data.intValue;
             }
             case 3 -> {
                 generate(node.getChildAt(1));
@@ -209,22 +234,45 @@ public class Generator {
         for (TreeNode<NodeData> child : node.children)
             generate(child);
         node.data.value = node.getChildAt(0).data.value;
+        node.data.intValue = node.getChildAt(0).data.intValue;
     }
 
     private void genOperaExpr(TreeNode<NodeData> node) {
-        generate(node.getChildAt(0));
-        String value_1 = node.getChildAt(0).data.value;
-        String value_2 = node.getChildAt(0).data.value;
-        for (int i = 2; i < node.children.size(); i+=2) {
-            generate(node.getChildAt(i));
-            value_2 = "%" + (regId++);
-            product += value_2 + " = "
-                    + flagOfOpera(node.getChildAt(i-1).data.value)
-                    + " i32 " + value_1
-                    + ", " + node.getChildAt(i).data.value + "\n";
-            value_1 = value_2;
+        if (analyzer.curBlockId == 0) {
+            generate(node.getChildAt(0));
+            // 计算实际值
+            Integer v1 = node.getChildAt(0).data.intValue;
+            Integer v2 = v1;
+            if (v1 == null) return;
+            for (int i = 2; i < node.children.size(); i+=2) {
+                generate(node.getChildAt(i));
+                Integer v_temp = node.getChildAt(i).data.intValue;
+                if (v_temp == null) return;
+                switch (node.getChildAt(i-1).data.value) {
+                    case "+" -> v2 = v1 + v_temp;
+                    case "-" -> v2 = v1 - v_temp;
+                    case "*" -> v2 = v1 * v_temp;
+                    case "/" -> v2 = v1 / v_temp;
+                    case "%" -> v2 = v1 % v_temp;
+                }
+                v1 = v2;
+            }
+            node.data.intValue = v2;
+        } else {
+            generate(node.getChildAt(0));
+            String value_1 = node.getChildAt(0).data.value;
+            String value_2 = node.getChildAt(0).data.value;
+            for (int i = 2; i < node.children.size(); i+=2) {
+                generate(node.getChildAt(i));
+                value_2 = "%" + (regId++);
+                product += value_2 + " = "
+                        + flagOfOpera(node.getChildAt(i-1).data.value)
+                        + " i32 " + value_1
+                        + ", " + node.getChildAt(i).data.value + "\n";
+                value_1 = value_2;
+            }
+            node.data.value = value_2;
         }
-        node.data.value = value_2;
     }
 
     private void genCmpExpr(TreeNode<NodeData> node) {
@@ -271,17 +319,28 @@ public class Generator {
             case 1 -> {
                 genPrimExpr(node.getChildAt(0));
                 node.data.value = node.getChildAt(0).data.value;
+                node.data.intValue = node.getChildAt(0).data.intValue;
             }
             case 2 -> {
                 genUnaryExpr(node.getChildAt(1));
-                node.data.value = "%" + (regId++);
+                if (analyzer.curBlockId > 0)
+                    node.data.value = "%" + (regId++);
                 String opera = node.getChildAt(0).getChildAt(0).data.value;
                 switch (opera) {
                     case "+", "-" -> {
-                        product += node.data.value + " = "
-                                + flagOfOpera(opera)
-                                + " i32 0, "
-                                + node.getChildAt(1).data.value + "\n";
+                        if (analyzer.curBlockId > 0)
+                            product += node.data.value + " = "
+                                    + flagOfOpera(opera)
+                                    + " i32 0, "
+                                    + node.getChildAt(1).data.value + "\n";
+                        // 计算实际值
+                        Integer v = node.getChildAt(1).data.intValue;
+                        if (v != null) {
+                            if (opera.equals("+"))
+                                node.data.intValue = node.getChildAt(1).data.intValue;
+                            else node.data.intValue = - node.getChildAt(1).data.intValue;
+                        }
+
                     }
                     case "!" -> {
                         product += node.data.value + " = icmp eq i32 0, "
@@ -330,13 +389,16 @@ public class Generator {
         if (childCnt == 1) {
             if (node.getChildAt(0).data.name.equals("Number")) {
                 node.data.value = node.getChildAt(0).data.value;
+                node.data.intValue = Integer.parseInt(node.data.value);
             } else if (node.getChildAt(0).data.name.equals("Lval")) {
                 generate(node.getChildAt(0));
                 node.data.value = node.getChildAt(0).data.value;
+                node.data.intValue = node.getChildAt(0).data.intValue;
             }
         } else {
             generate(node.getChildAt(1));
             node.data.value = node.getChildAt(1).data.value;
+            node.data.intValue = node.getChildAt(1).data.intValue;
         }
     }
 
@@ -352,13 +414,27 @@ public class Generator {
     }
 
     private void genRLval(TreeNode<NodeData> node) {
-        String rLval = "%" + (regId++);
-        node.data.value = rLval;
-        String val = node.getChildAt(0).data.value;
-        Item valItem = symTable.getItem(val);
-        product += rLval + " = load " + valItem.vType
-                + ", " + valItem.vType + "* "
-                + "%" + valItem.regId + "\n";
+        if (analyzer.curBlockId == 0) {
+            String val = node.getChildAt(0).data.value;
+            Item valItem = symTable.getItem(val);
+            // 计算值
+            if (valItem.hasCerVal)
+                node.data.intValue = valItem.intValue;
+        } else {
+            String rLval = "%" + (regId++);
+            node.data.value = rLval;
+            String val = node.getChildAt(0).data.value;
+            Item valItem = symTable.getItem(val);
+            // 能计算值则计算值
+            if (valItem.hasCerVal)
+                node.data.intValue = valItem.intValue;
+            product += rLval + " = load " + valItem.vType
+                    + ", " + valItem.vType + "* ";
+            if (valItem.blockId == 0)
+                product += "@" + valItem.name + "\n";
+            else
+                product += "%" + valItem.regId + "\n";
+        }
     }
 
 

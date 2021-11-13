@@ -11,6 +11,7 @@ public class NodeData {
     public int regIdx;
     public String name;
     public String value;
+    public Integer intValue;
 
     public NodeData() {
         this.name = "";

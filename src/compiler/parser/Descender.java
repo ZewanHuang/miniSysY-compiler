@@ -46,8 +46,27 @@ public class Descender {
 
     private void compUnit() {
         TreeNode<NodeData> node = ast;
-        ast = node.addChild(new NodeData("FuncDef"));
-        funcDef();
+        while (!curToken.isEmpty()) {
+            if (curToken.equals("const")) {
+                ast = node.addChild(new NodeData("Decl"));
+                decl();
+            } else if (curToken.equals("void")) {
+                ast = node.addChild(new NodeData("FuncDef"));
+                funcDef();
+            } else if (curToken.equals("int")) {
+                try {
+                    if (tokens.get(tokenId+1).equals("(")) {
+                        ast = node.addChild(new NodeData("FuncDef"));
+                        funcDef();
+                    } else {
+                        ast = node.addChild(new NodeData("Decl"));
+                        decl();
+                    }
+                } catch (Exception e) {
+                    error();
+                }
+            }
+        }
     }
 
     private void funcDef() {
