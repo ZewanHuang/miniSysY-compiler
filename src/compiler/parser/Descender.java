@@ -289,6 +289,21 @@ public class Descender {
                     }
                 } else error();
             } else error();
+        } else if (curToken.equals("while")) {
+            ast = node.addChild(new NodeData(curToken));
+            nextToken();
+            if (curToken.equals("(")) {
+                ast = node.addChild(new NodeData(curToken));
+                nextToken();
+                ast = node.addChild(new NodeData("Cond"));
+                cond();
+                if (curToken.equals(")")) {
+                    ast = node.addChild(new NodeData(curToken));
+                    nextToken();
+                    ast = node.addChild(new NodeData("Stmt"));
+                    stmt();
+                } else error();
+            } else error();
         } else {
             ast = node.addChild(new NodeData("Expr"));
             expr();

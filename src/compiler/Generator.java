@@ -183,20 +183,40 @@ public class Generator {
                         + valItem.vType + "* " + "%" + valItem.regId + "\n";
             }
             case 5 -> {
-                generate(node.getChildAt(2));
-                product += "br i1 " + node.getChildAt(2).data.value
-                        + ", label ";
-                int len = product.length();
-                int reg_1 = (regId++);
-                product += "\n" + reg_1 + ":\n";
-                generate(node.getChildAt(4));
-                int reg_2 = (regId++);
-                if (!hasRet())
-                    product += "br label %" + reg_2 + "\n";
-                product += "\n" + reg_2 + ":\n";
-                StringBuilder buffer = new StringBuilder(product);
-                product = buffer.insert(len,
-                        "%" + reg_1 + ", label %" + reg_2 + "\n").toString();
+                if (node.getChildAt(0).data.value.equals("if")) {
+                    generate(node.getChildAt(2));
+                    product += "br i1 " + node.getChildAt(2).data.value
+                            + ", label ";
+                    int len = product.length();
+                    int reg_1 = (regId++);
+                    product += "\n" + reg_1 + ":\n";
+                    generate(node.getChildAt(4));
+                    int reg_2 = (regId++);
+                    if (!hasRet())
+                        product += "br label %" + reg_2 + "\n";
+                    product += "\n" + reg_2 + ":\n";
+                    StringBuilder buffer = new StringBuilder(product);
+                    product = buffer.insert(len,
+                            "%" + reg_1 + ", label %" + reg_2 + "\n").toString();
+                } else if (node.getChildAt(0).data.value.equals("while")) {
+                    int reg_1 = (regId++);
+                    product += "br label %" + reg_1 + "\n";
+                    product += "\n" + reg_1 + ":\n";
+                    generate(node.getChildAt(2));
+                    product += "br i1 " + node.getChildAt(2).data.value
+                            + ", label ";
+                    int len = product.length();
+                    int reg_2 = (regId++);
+                    product += "\n" + reg_2 + ":\n";
+                    generate(node.getChildAt(4));
+                    if (!hasRet())
+                        product += "br label %" + reg_1 + "\n";
+                    int reg_3 = (regId++);
+                    product += "\n" + reg_3 + ":\n";
+                    StringBuilder buffer = new StringBuilder(product);
+                    product = buffer.insert(len,
+                            "%" + reg_2 + ", label %" + reg_3 + "\n").toString();
+                }
             }
             case 7 -> {
                 generate(node.getChildAt(2));
