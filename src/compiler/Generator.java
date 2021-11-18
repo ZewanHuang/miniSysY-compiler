@@ -113,7 +113,7 @@ public class Generator {
         Item funcItem = symTable.getItem(funcName);
         product += "define dso_local " + funcItem.vType + " @" + funcName + "() {\n";
         visit(node.getChildAt(4));
-        product += "}";
+        product += "\n}";
     }
 
     private void visitBlock(TreeNode<NodeData> node) {

@@ -28,7 +28,7 @@ public class Optimizer {
                 if (line.startsWith("br") || line.startsWith("ret"))
                     cnt++;
             }
-            result += "\n\n";
+            result += "\n";
         }
         product = result;
     }
