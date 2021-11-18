@@ -114,9 +114,15 @@ public class Generator {
             String decl = "%" + (regId++);
             product += decl + " = alloca " + declItem.vType + "\n";
             generate(node.getChildAt(2));
-            product += "store " + declItem.vType + " "
-                    + node.getChildAt(2).data.value + ", "
-                    + declItem.vType + "* " + decl + "\n";
+            if (declItem.blockId == 0) {
+                product += "store " + declItem.vType + " "
+                        + node.getChildAt(2).data.value + ", "
+                        + declItem.vType + "* @" + declName + "\n";
+            } else {
+                product += "store " + declItem.vType + " "
+                        + node.getChildAt(2).data.value + ", "
+                        + declItem.vType + "* " + decl + "\n";
+            }
         }
         declItem.intValue = node.getChildAt(2).data.intValue;
     }
@@ -138,11 +144,12 @@ public class Generator {
         Item declItem = symTable.getItem(declName);
 
         if (declItem.blockId == 0) {
-            if (node.children.size() == 0) {
+            if (node.children.size() == 1) {
                 product += "@" + declName + " = dso_local global i32 0\n";
                 declItem.intValue = 0;
             } else {
                 generate(node.getChildAt(2));
+                System.out.println(node);
                 product += "@" + declName + " = dso_local global i32 "
                         + node.getChildAt(2).data.intValue + "\n";
                 declItem.intValue = node.getChildAt(2).data.intValue;
@@ -154,9 +161,15 @@ public class Generator {
 
             if (node.children.size() >= 3) {
                 generate(node.getChildAt(2));
-                product += "store " + declItem.vType + " "
-                        + node.getChildAt(2).data.value + ", "
-                        + declItem.vType + "* " + decl + "\n";
+                if (declItem.blockId == 0) {
+                    product += "store " + declItem.vType + " "
+                            + node.getChildAt(2).data.value + ", "
+                            + declItem.vType + "* @" + declName + "\n";
+                } else {
+                    product += "store " + declItem.vType + " "
+                            + node.getChildAt(2).data.value + ", "
+                            + declItem.vType + "* " + decl + "\n";
+                }
                 declItem.intValue = node.getChildAt(2).data.intValue;
             }
         }
@@ -196,9 +209,15 @@ public class Generator {
                 String val = node.getLeaves().get(0).data.value;
                 Item valItem = symTable.getItem(val);
                 generate(node.getChildAt(2));
-                product += "store " + valItem.vType + " "
-                        + node.getChildAt(2).data.value + ", "
-                        + valItem.vType + "* " + "%" + valItem.regId + "\n";
+                if (valItem.blockId == 0) {
+                    product += "store " + valItem.vType + " "
+                            + node.getChildAt(2).data.value + ", "
+                            + valItem.vType + "* @" + val + "\n";
+                } else {
+                    product += "store " + valItem.vType + " "
+                            + node.getChildAt(2).data.value + ", "
+                            + valItem.vType + "* " + "%" + valItem.regId + "\n";
+                }
             }
             case 5 -> {
                 if (node.getChildAt(0).data.value.equals("if")) {
