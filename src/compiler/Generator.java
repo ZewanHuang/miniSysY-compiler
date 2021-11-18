@@ -6,6 +6,9 @@ import compiler.semantics.Analyzer;
 import compiler.semantics.symtable.Item;
 import compiler.semantics.symtable.SymTable;
 
+import java.util.ArrayList;
+import java.util.Stack;
+
 
 public class Generator {
 
@@ -22,10 +25,27 @@ public class Generator {
     /**
      * 为循环而设立的 tag
      */
-    private boolean tag_cont = false;
-    private boolean tag_brea = true;
-    private int loop_start;
-    private int loop_out;
+    private Stack<Recorder> stk = new Stack<Recorder>();
+
+    private class Mark {
+        String tag;
+
+        public Mark(String t) {
+            this.tag = t;
+        }
+    }
+
+    private class Recorder {
+        ArrayList<Mark> marks;
+
+        public Recorder() {
+            this.marks = new ArrayList<>();
+        }
+
+        public void record(Mark m) {
+            this.marks.add(m);
+        }
+    }
 
     public Generator(TreeNode<NodeData> tree) {
         this.ast = tree;
@@ -189,10 +209,14 @@ public class Generator {
             case 2 -> {
                 switch (node.getChildAt(0).data.value) {
                     case "break" -> {
-                        this.tag_brea = true;
+                        int markId = stk.peek().marks.size();
+                        stk.peek().record(new Mark("break" + markId));
+                        product += "break" + markId;
                     }
                     case "continue" -> {
-                        this.tag_cont = true;
+                        int markId = stk.peek().marks.size();
+                        stk.peek().record(new Mark("continue" + markId));
+                        product += "continue" + markId;
                     }
                     default -> {
                         generate(node.getChildAt(0));
@@ -236,6 +260,8 @@ public class Generator {
                     product = buffer.insert(len,
                             "%" + reg_1 + ", label %" + reg_2 + "\n").toString();
                 } else if (node.getChildAt(0).data.value.equals("while")) {
+                    stk.push(new Recorder());
+
                     int reg_1 = (regId++);
                     product += "br label %" + reg_1 + "\n";
                     product += "\n" + reg_1 + ":\n";
@@ -246,6 +272,7 @@ public class Generator {
                     int reg_2 = (regId++);
                     product += "\n" + reg_2 + ":\n";
                     generate(node.getChildAt(4));
+
                     if (!hasRet())
                         product += "br label %" + reg_1 + "\n";
                     int reg_3 = (regId++);
@@ -253,6 +280,15 @@ public class Generator {
                     StringBuilder buffer = new StringBuilder(product);
                     product = buffer.insert(len,
                             "%" + reg_2 + ", label %" + reg_3 + "\n").toString();
+
+                    for (var mark : stk.peek().marks) {
+                        if (mark.tag.startsWith("break")) {
+                            repRecord(mark.tag, "br label %" + reg_3 + "\n");
+                        } else if (mark.tag.startsWith("continue")) {
+                            repRecord(mark.tag, "br label %" + reg_1 + "\n");
+                        }
+                    }
+                    stk.pop();
                 }
             }
             case 7 -> {
@@ -539,6 +575,21 @@ public class Generator {
     private boolean hasRet() {
         String[] array = product.split("\n");
         return array[array.length-1].startsWith("ret");
+    }
+
+    /**
+     * 向 product 的 pos 位置插入 content
+     *
+     * @param pos product位置
+     * @param content 字符串内容
+     */
+    private void insRecord(int pos, String content) {
+        StringBuilder buffer = new StringBuilder(product);
+        product = buffer.insert(pos, content).toString();
+    }
+
+    private void repRecord(String src, String target) {
+        product = product.replace(src, target);
     }
 
 }

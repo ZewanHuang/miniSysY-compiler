@@ -67,7 +67,8 @@ public class Parser {
         TreeNode<NodeData> ast = descender.buildAST();
         new Analyzer(ast).buildTable();
         Generator generator = new Generator(ast);
-        return generator.generate();
+        Optimizer optimizer = new Optimizer(generator.generate());
+        return optimizer.optim();
     }
 
 }
