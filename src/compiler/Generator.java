@@ -113,7 +113,7 @@ public class Generator {
         Item funcItem = symTable.getItem(funcName);
         product += "define dso_local " + funcItem.vType + " @" + funcName + "() {\n";
         visit(node.getChildAt(4));
-        product += "\n}";
+        product += "}";
     }
 
     private void visitBlock(TreeNode<NodeData> node) {
@@ -311,7 +311,11 @@ public class Generator {
         product += "\n" + reg_2 + ":\n";
         visit(node.getChildAt(6));
         int reg_3 = (regId++);
+        if (!hasRet())
+            product += "br label %" + reg_3 + "\n";
         product += "\n" + reg_3 + ":\n";
+        if (!hasRet(len_2))
+            insRecord(len_2, "br label %" + reg_3 + "\n");
         insRecord(len_1, "%" + reg_1 + ", label %" + reg_2 + "\n");
     }
 

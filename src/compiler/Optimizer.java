@@ -25,7 +25,7 @@ public class Optimizer {
                     break;
                 }
                 result += line + "\n";
-                if (line.startsWith("br") || line.startsWith("ret"))
+                if (line.startsWith("br"))
                     cnt++;
             }
             result += "\n";
