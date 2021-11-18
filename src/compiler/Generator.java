@@ -136,11 +136,12 @@ public class Generator {
         Item declItem = symTable.getItem(declName);
 
         if (declItem.blockId == 0) {
-            if (node.children.size() == 0) {
+            if (node.children.size() == 1) {
                 product += "@" + declName + " = dso_local global i32 0\n";
                 declItem.intValue = 0;
             } else {
                 generate(node.getChildAt(2));
+                System.out.println(node);
                 product += "@" + declName + " = dso_local global i32 "
                         + node.getChildAt(2).data.intValue + "\n";
                 declItem.intValue = node.getChildAt(2).data.intValue;
