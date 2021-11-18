@@ -169,7 +169,6 @@ public class Generator {
                 declItem.intValue = 0;
             } else {
                 visit(node.getChildAt(2));
-                System.out.println(node);
                 product += "@" + declName + " = dso_local global i32 "
                         + node.getChildAt(2).data.intValue + "\n";
                 declItem.intValue = node.getChildAt(2).data.intValue;

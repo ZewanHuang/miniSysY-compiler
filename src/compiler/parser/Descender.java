@@ -189,6 +189,16 @@ public class Descender {
         if (curToken.isIdent()) {
             ast = node.addChild(new NodeData(curToken));
             nextToken();
+            while (curToken.equals("[")) {
+                ast = node.addChild(new NodeData(curToken));
+                nextToken();
+                ast = node.addChild(new NodeData("ConstExpr"));
+                constExp();
+                if (curToken.equals("]")) {
+                    ast = node.addChild(new NodeData(curToken));
+                    nextToken();
+                } else error();
+            }
             if (curToken.equals("=")) {
                 ast = node.addChild(new NodeData(curToken));
                 nextToken();
@@ -211,6 +221,16 @@ public class Descender {
         if (curToken.isIdent()) {
             ast = node.addChild(new NodeData(curToken));
             nextToken();
+            while (curToken.equals("[")) {
+                ast = node.addChild(new NodeData(curToken));
+                nextToken();
+                ast = node.addChild(new NodeData("ConstExpr"));
+                constExp();
+                if (curToken.equals("]")) {
+                    ast = node.addChild(new NodeData(curToken));
+                    nextToken();
+                } else error();
+            }
             if (curToken.equals("=")) {
                 ast = node.addChild(new NodeData(curToken));
                 nextToken();
@@ -222,8 +242,30 @@ public class Descender {
 
     private void constInitVal() {
         TreeNode<NodeData> node = ast;
-        ast = node.addChild(new NodeData("ConstExp"));
-        constExp();
+        if (curToken.equals("{")) {
+            ast = node.addChild(new NodeData(curToken));
+            nextToken();
+            if (curToken.equals("}")) {
+                ast = node.addChild(new NodeData(curToken));
+                nextToken();
+            } else {
+                ast = node.addChild(new NodeData("ConstInitVal"));
+                constInitVal();
+                while (curToken.equals(",")) {
+                    ast = node.addChild(new NodeData(curToken));
+                    nextToken();
+                    ast = node.addChild(new NodeData("ConstInitVal"));
+                    constInitVal();
+                }
+                if (curToken.equals("}")) {
+                    ast = node.addChild(new NodeData(curToken));
+                    nextToken();
+                } else error();
+            }
+        } else {
+            ast = node.addChild(new NodeData("ConstExp"));
+            constExp();
+        }
     }
 
     private void constExp() {
@@ -234,8 +276,30 @@ public class Descender {
 
     private void initVal() {
         TreeNode<NodeData> node = ast;
-        ast = node.addChild(new NodeData("Expr"));
-        expr();
+        if (curToken.equals("{")) {
+            ast = node.addChild(new NodeData(curToken));
+            nextToken();
+            if (curToken.equals("}")) {
+                ast = node.addChild(new NodeData(curToken));
+                nextToken();
+            } else {
+                ast = node.addChild(new NodeData("InitVal"));
+                initVal();
+                while (curToken.equals(",")) {
+                    ast = node.addChild(new NodeData(curToken));
+                    nextToken();
+                    ast = node.addChild(new NodeData("InitVal"));
+                    initVal();
+                }
+                if (curToken.equals("}")) {
+                    ast = node.addChild(new NodeData(curToken));
+                    nextToken();
+                } else error();
+            }
+        } else {
+            ast = node.addChild(new NodeData("Expr"));
+            expr();
+        }
     }
 
     private void stmt() {
@@ -434,6 +498,15 @@ public class Descender {
         if (curToken.isIdent()) {
             ast = node.addChild(new NodeData(curToken));
             nextToken();
+            while (curToken.equals("[")) {
+                ast = node.addChild(new NodeData(curToken));
+                nextToken();
+                expr();
+                if (curToken.equals("]")) {
+                    ast = node.addChild(new NodeData(curToken));
+                    nextToken();
+                } else error();
+            }
         } else error();
     }
 
