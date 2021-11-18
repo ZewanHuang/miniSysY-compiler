@@ -356,19 +356,44 @@ public class Descender {
         if (curToken.equals("{")) {
             ast = node.addChild(new NodeData("Block"));
             block();
-        } else if (curToken.isIdent() && tokens.get(tokenId).equals("=")) {
-            ast = node.addChild(new NodeData("Lval"));
-            lval();
-            if (curToken.equals("=")) {
-                ast = node.addChild(new NodeData(curToken));
-                nextToken();
+        } else if (curToken.isIdent()) {
+            boolean isAligned = false;
+            try {
+                int tokenId = this.tokenId;
+                int i;
+                for (i = tokenId; i < this.tokens.size(); i++)
+                    if (this.tokens.get(i).equals(";"))
+                        break;
+                for (int j = tokenId; j <= i; j++)
+                    if (this.tokens.get(j).equals("=")) {
+                        isAligned = true;
+                        break;
+                    }
+            } catch (Exception e) {
+                error();
+            }
+
+            if (isAligned) {
+                ast = node.addChild(new NodeData("Lval"));
+                lval();
+                if (curToken.equals("=")) {
+                    ast = node.addChild(new NodeData(curToken));
+                    nextToken();
+                    ast = node.addChild(new NodeData("Expr"));
+                    expr();
+                    if (curToken.equals(";")) {
+                        ast = node.addChild(new NodeData(curToken));
+                        nextToken();
+                    } else error();
+                } else error();
+            } else {
                 ast = node.addChild(new NodeData("Expr"));
                 expr();
                 if (curToken.equals(";")) {
-                    ast = node.addChild(new NodeData(curToken));
+                    ast = node.addChild(new NodeData(";"));
                     nextToken();
-                } else error();
-            } else error();
+                }
+            }
         } else if (curToken.equals(";")) {
             ast = node.addChild(new NodeData(curToken));
             nextToken();
