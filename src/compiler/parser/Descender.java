@@ -84,9 +84,58 @@ public class Descender {
                     nextToken();
                     ast = node.addChild(new NodeData("Block"));
                     block();
-                } else error();
+                } else {
+                    ast = node.addChild(new NodeData("FuncFParams"));
+                    funcFParams();
+                    if (curToken.equals(")")) {
+                        ast = node.addChild(new NodeData(curToken));
+                        nextToken();
+                        ast = node.addChild(new NodeData("Block"));
+                        block();
+                    } else error();
+                }
             } else error();
         }
+    }
+
+    private void funcFParams() {
+        TreeNode<NodeData> node = ast;
+        ast = node.addChild(new NodeData("FuncFParam"));
+        funcFParam();
+        while (curToken.equals(",")) {
+            ast = node.addChild(new NodeData(curToken));
+            nextToken();
+            ast = node.addChild(new NodeData("FuncFParam"));
+            funcFParam();
+        }
+    }
+
+    private void funcFParam() {
+        TreeNode<NodeData> node = ast;
+        ast = node.addChild(new NodeData("BType"));
+        btype();
+        if (curToken.isIdent()) {
+            ast = node.addChild(new NodeData(curToken));
+            nextToken();
+            if (curToken.equals("[")) {
+                ast = node.addChild(new NodeData(curToken));
+                nextToken();
+                if (curToken.equals("]")) {
+                    ast = node.addChild(new NodeData(curToken));
+                    nextToken();
+                    while (curToken.equals("[")) {
+                        ast = node.addChild(new NodeData(curToken));
+                        nextToken();
+                        ast = node.addChild(new NodeData("Expr"));
+                        expr();
+                        if (curToken.equals("]")) {
+                            ast = node.addChild(new NodeData(curToken));
+                            nextToken();
+                        } else error();
+                    }
+                } else error();
+            }
+        } else error();
     }
 
     private void funcType() {
@@ -326,11 +375,16 @@ public class Descender {
         } else if (curToken.equals("return")) {
             ast = node.addChild(new NodeData(curToken));
             nextToken();
-            ast = node.addChild(new NodeData("Expr"));
-            expr();
             if (curToken.equals(";")) {
                 ast = node.addChild(new NodeData(curToken));
                 nextToken();
+            } else {
+                ast = node.addChild(new NodeData("Expr"));
+                expr();
+                if (curToken.equals(";")) {
+                    ast = node.addChild(new NodeData(curToken));
+                    nextToken();
+                } else error();
             }
         } else if (curToken.equals("if")) {
             ast = node.addChild(new NodeData(curToken));
