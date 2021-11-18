@@ -304,6 +304,20 @@ public class Descender {
                     stmt();
                 } else error();
             } else error();
+        } else if (curToken.equals("break")) {
+            ast = node.addChild(new NodeData(curToken));
+            nextToken();
+            if (curToken.equals(";")) {
+                ast = node.addChild(new NodeData(curToken));
+                nextToken();
+            } else error();
+        } else if (curToken.equals("continue")) {
+            ast = node.addChild(new NodeData(curToken));
+            nextToken();
+            if (curToken.equals(";")) {
+                ast = node.addChild(new NodeData(curToken));
+                nextToken();
+            } else error();
         } else {
             ast = node.addChild(new NodeData("Expr"));
             expr();

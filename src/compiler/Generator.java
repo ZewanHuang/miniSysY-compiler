@@ -19,6 +19,14 @@ public class Generator {
     private SymTable symTable;
     private Analyzer analyzer;
 
+    /**
+     * 为循环而设立的 tag
+     */
+    private boolean tag_cont = false;
+    private boolean tag_brea = true;
+    private int loop_start;
+    private int loop_out;
+
     public Generator(TreeNode<NodeData> tree) {
         this.ast = tree;
         this.regId = 1;
@@ -166,9 +174,19 @@ public class Generator {
                 generate(node.getChildAt(0));
             }
             case 2 -> {
-                generate(node.getChildAt(0));
-                node.data.value = node.getChildAt(0).data.value;
-                node.data.intValue = node.getChildAt(0).data.intValue;
+                switch (node.getChildAt(0).data.value) {
+                    case "break" -> {
+                        this.tag_brea = true;
+                    }
+                    case "continue" -> {
+                        this.tag_cont = true;
+                    }
+                    default -> {
+                        generate(node.getChildAt(0));
+                        node.data.value = node.getChildAt(0).data.value;
+                        node.data.intValue = node.getChildAt(0).data.intValue;
+                    }
+                }
             }
             case 3 -> {
                 generate(node.getChildAt(1));
