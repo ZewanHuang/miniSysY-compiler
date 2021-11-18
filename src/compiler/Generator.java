@@ -66,7 +66,7 @@ public class Generator {
      * @return llvm字符串形式
      */
     public String generate() {
-        generate(ast);
+        visit(ast);
         return product;
     }
 
@@ -75,30 +75,30 @@ public class Generator {
      *
      * @param node 节点
      */
-    private void generate(TreeNode<NodeData> node) {
+    private void visit(TreeNode<NodeData> node) {
         analyzer.handleBlock(node);
         analyzer.register(node);
         switch (node.data.name) {
-            case "FuncDef" -> genFuncDef(node);
-            case "Block" -> genBlock(node);
-            case "ConstDef" -> genConstDef(node);
-            case "ConstInitVal" -> genConstInitVal(node);
-            case "ConstExp" -> genConstExp(node);
-            case "VarDef" -> genVarDef(node);
-            case "InitVal" -> genInitVal(node);
-            case "Stmt" -> genStmt(node);
-            case "Expr" -> genExpr(node);
-            case "AddExpr", "MulExpr" -> genOperaExpr(node);
-            case "UnaryExpr" -> genUnaryExpr(node);
-            case "PrimaryExpr" -> genPrimExpr(node);
-            case "FuncRParams" -> genFuncRParams(node);
-            case "Lval" -> genRLval(node);
-            case "Cond" -> genCond(node);
-            case "RelExpr", "EqExpr" -> genCmpExpr(node);
-            case "LAndExpr", "LOrExpr" -> genLogicExpr(node);
+            case "FuncDef" -> visitFuncDef(node);
+            case "Block" -> visitBlock(node);
+            case "ConstDef" -> visitConstDef(node);
+            case "ConstInitVal" -> visitConstInitVal(node);
+            case "ConstExp" -> visitConstExp(node);
+            case "VarDef" -> visitVarDef(node);
+            case "InitVal" -> visitInitVal(node);
+            case "Stmt" -> visitStmt(node);
+            case "Expr" -> visitExpr(node);
+            case "AddExpr", "MulExpr" -> visitOperaExpr(node);
+            case "UnaryExpr" -> visitUnaryExpr(node);
+            case "PrimaryExpr" -> visitPrimExpr(node);
+            case "FuncRParams" -> visitFuncRParams(node);
+            case "Lval" -> visitRLval(node);
+            case "Cond" -> visitCond(node);
+            case "RelExpr", "EqExpr" -> visitCmpExpr(node);
+            case "LAndExpr", "LOrExpr" -> visitLogicExpr(node);
             default -> {
                 for (TreeNode<NodeData> child : node.children)
-                    generate(child);
+                    visit(child);
             }
         }
     }
@@ -108,32 +108,32 @@ public class Generator {
      *
      * @param node FuncDef节点
      */
-    private void genFuncDef(TreeNode<NodeData> node) {
+    private void visitFuncDef(TreeNode<NodeData> node) {
         String funcName = node.getChildAt(1).data.value;
         Item funcItem = symTable.getItem(funcName);
         product += "define dso_local " + funcItem.vType + " @" + funcName + "() {\n";
-        generate(node.getChildAt(4));
+        visit(node.getChildAt(4));
         product += "}";
     }
 
-    private void genBlock(TreeNode<NodeData> node) {
+    private void visitBlock(TreeNode<NodeData> node) {
         for (TreeNode<NodeData> child : node.children)
-            generate(child);
+            visit(child);
     }
 
-    private void genConstDef(TreeNode<NodeData> node) {
+    private void visitConstDef(TreeNode<NodeData> node) {
         String declName = node.getChildAt(0).data.value;
         Item declItem = symTable.getItem(declName);
         // 全局变量求值，局部变量声明不求值
         if (declItem.blockId == 0) {
-            generate(node.getChildAt(2));
+            visit(node.getChildAt(2));
             product += "@" + declName + " = dso_local global i32 "
                     + node.getChildAt(2).data.intValue + "\n";
         } else {
             declItem.regId = regId;
             String decl = "%" + (regId++);
             product += decl + " = alloca " + declItem.vType + "\n";
-            generate(node.getChildAt(2));
+            visit(node.getChildAt(2));
             if (declItem.blockId == 0) {
                 product += "store " + declItem.vType + " "
                         + node.getChildAt(2).data.value + ", "
@@ -147,19 +147,19 @@ public class Generator {
         declItem.intValue = node.getChildAt(2).data.intValue;
     }
 
-    private void genConstInitVal(TreeNode<NodeData> node) {
-        generate(node.getChildAt(0));
+    private void visitConstInitVal(TreeNode<NodeData> node) {
+        visit(node.getChildAt(0));
         node.data.value = node.getChildAt(0).data.value;
         node.data.intValue = node.getChildAt(0).data.intValue;
     }
 
-    private void genConstExp(TreeNode<NodeData> node) {
-        generate(node.getChildAt(0));
+    private void visitConstExp(TreeNode<NodeData> node) {
+        visit(node.getChildAt(0));
         node.data.value = node.getChildAt(0).data.value;
         node.data.intValue = node.getChildAt(0).data.intValue;
     }
 
-    private void genVarDef(TreeNode<NodeData> node) {
+    private void visitVarDef(TreeNode<NodeData> node) {
         String declName = node.getChildAt(0).data.value;
         Item declItem = symTable.getItem(declName);
 
@@ -168,7 +168,7 @@ public class Generator {
                 product += "@" + declName + " = dso_local global i32 0\n";
                 declItem.intValue = 0;
             } else {
-                generate(node.getChildAt(2));
+                visit(node.getChildAt(2));
                 System.out.println(node);
                 product += "@" + declName + " = dso_local global i32 "
                         + node.getChildAt(2).data.intValue + "\n";
@@ -180,7 +180,7 @@ public class Generator {
             product += decl + " = alloca " + declItem.vType + "\n";
 
             if (node.children.size() >= 3) {
-                generate(node.getChildAt(2));
+                visit(node.getChildAt(2));
                 if (declItem.blockId == 0) {
                     product += "store " + declItem.vType + " "
                             + node.getChildAt(2).data.value + ", "
@@ -195,150 +195,208 @@ public class Generator {
         }
     }
 
-    private void genInitVal(TreeNode<NodeData> node) {
-        generate(node.getChildAt(0));
+    private void visitInitVal(TreeNode<NodeData> node) {
+        visit(node.getChildAt(0));
         node.data.value = node.getChildAt(0).data.value;
         node.data.intValue = node.getChildAt(0).data.intValue;
     }
 
-    private void genStmt(TreeNode<NodeData> node) {
-        switch (node.children.size()) {
-            case 1 -> {
-                generate(node.getChildAt(0));
-            }
-            case 2 -> {
-                switch (node.getChildAt(0).data.value) {
-                    case "break" -> {
-                        int markId = stk.peek().marks.size();
-                        stk.peek().record(new Mark("break" + markId));
-                        product += "break" + markId;
-                    }
-                    case "continue" -> {
-                        int markId = stk.peek().marks.size();
-                        stk.peek().record(new Mark("continue" + markId));
-                        product += "continue" + markId;
-                    }
-                    default -> {
-                        generate(node.getChildAt(0));
-                        node.data.value = node.getChildAt(0).data.value;
-                        node.data.intValue = node.getChildAt(0).data.intValue;
-                    }
-                }
-            }
-            case 3 -> {
-                generate(node.getChildAt(1));
-                product += "ret i32 " + node.getChildAt(1).data.value + "\n";
-            }
-            case 4 -> {
-                String val = node.getLeaves().get(0).data.value;
-                Item valItem = symTable.getItem(val);
-                generate(node.getChildAt(2));
-                if (valItem.blockId == 0) {
-                    product += "store " + valItem.vType + " "
-                            + node.getChildAt(2).data.value + ", "
-                            + valItem.vType + "* @" + val + "\n";
-                } else {
-                    product += "store " + valItem.vType + " "
-                            + node.getChildAt(2).data.value + ", "
-                            + valItem.vType + "* " + "%" + valItem.regId + "\n";
-                }
-            }
-            case 5 -> {
-                if (node.getChildAt(0).data.value.equals("if")) {
-                    generate(node.getChildAt(2));
-                    product += "br i1 " + node.getChildAt(2).data.value
-                            + ", label ";
-                    int len = product.length();
-                    int reg_1 = (regId++);
-                    product += "\n" + reg_1 + ":\n";
-                    generate(node.getChildAt(4));
-                    int reg_2 = (regId++);
-                    if (!hasRet())
-                        product += "br label %" + reg_2 + "\n";
-                    product += "\n" + reg_2 + ":\n";
-                    StringBuilder buffer = new StringBuilder(product);
-                    product = buffer.insert(len,
-                            "%" + reg_1 + ", label %" + reg_2 + "\n").toString();
-                } else if (node.getChildAt(0).data.value.equals("while")) {
-                    stk.push(new Recorder());
+    /**
+     * 处理 Stmt 节点的候选式 Block
+     *
+     * @param node Stmt节点
+     */
+    private void visitBlockStmt(TreeNode<NodeData> node) {
+        visit(node.getChildAt(0));
+    }
 
-                    int reg_1 = (regId++);
-                    product += "br label %" + reg_1 + "\n";
-                    product += "\n" + reg_1 + ":\n";
-                    generate(node.getChildAt(2));
-                    product += "br i1 " + node.getChildAt(2).data.value
-                            + ", label ";
-                    int len = product.length();
-                    int reg_2 = (regId++);
-                    product += "\n" + reg_2 + ":\n";
-                    generate(node.getChildAt(4));
+    /**
+     * 处理 Stmt 节点的候选式 'break' ';'
+     *
+     * @param node Stmt节点
+     */
+    private void visitBreakStmt(TreeNode<NodeData> node) {
+        int markId = stk.peek().marks.size();
+        stk.peek().record(new Mark("break" + markId));
+        product += "break" + markId;
+    }
 
-                    if (!hasRet())
-                        product += "br label %" + reg_1 + "\n";
-                    int reg_3 = (regId++);
-                    product += "\n" + reg_3 + ":\n";
-                    StringBuilder buffer = new StringBuilder(product);
-                    product = buffer.insert(len,
-                            "%" + reg_2 + ", label %" + reg_3 + "\n").toString();
+    /**
+     * 处理 Stmt 节点的候选式 'continue' ';'
+     *
+     * @param node Stmt节点
+     */
+    private void visitContinueStmt(TreeNode<NodeData> node) {
+        int markId = stk.peek().marks.size();
+        stk.peek().record(new Mark("continue" + markId));
+        product += "continue" + markId;
+    }
 
-                    for (var mark : stk.peek().marks) {
-                        if (mark.tag.startsWith("break")) {
-                            repRecord(mark.tag, "br label %" + reg_3 + "\n");
-                        } else if (mark.tag.startsWith("continue")) {
-                            repRecord(mark.tag, "br label %" + reg_1 + "\n");
-                        }
-                    }
-                    stk.pop();
-                }
-            }
-            case 7 -> {
-                generate(node.getChildAt(2));
-                product += "br i1 " + node.getChildAt(2).data.value + ", label ";
-                int len_1 = product.length();
-                int reg_1 = (regId++);
-                product += "\n" + reg_1 + ":\n";
-                generate(node.getChildAt(4));
-                int len_2 = product.length();
-                int reg_2 = (regId++);
-                product += "\n" + reg_2 + ":\n";
-                generate(node.getChildAt(6));
-                int reg_3 = (regId++);
-                if (!hasRet())
-                    product += "br label %" + reg_3 + "\n";
-                product += "\n" + reg_3 + ":\n";
-                StringBuilder buffer = new StringBuilder(product);
-                if (!hasRet(len_2))
-                    buffer.insert(len_2,
-                            "br label %" + reg_3 + "\n");
-                buffer.insert(len_1,
-                        "%" + reg_1 + ", label %" + reg_2 + "\n");
-                product = buffer.toString();
-            }
+    /**
+     * 处理 Stmt 节点的候选式 [Exp] ';'
+     *
+     * @param node Stmt节点
+     */
+    private void visitExprStmt(TreeNode<NodeData> node) {
+        visit(node.getChildAt(0));
+        node.data.value = node.getChildAt(0).data.value;
+        node.data.intValue = node.getChildAt(0).data.intValue;
+    }
+
+    /**
+     * 处理 Stmt 节点的候选式 'return' Exp ';'
+     *
+     * @param node Stmt节点
+     */
+    private void visitRetExpr(TreeNode<NodeData> node) {
+        visit(node.getChildAt(1));
+        product += "ret i32 " + node.getChildAt(1).data.value + "\n";
+    }
+
+    /**
+     * 处理 Stmt 节点的候选式 LVal '=' Exp ';'
+     *
+     * @param node Stmt节点
+     */
+    private void visitAlignExpr(TreeNode<NodeData> node) {
+        String val = node.getLeaves().get(0).data.value;
+        Item valItem = symTable.getItem(val);
+        visit(node.getChildAt(2));
+        // 全局变量和局部变量的赋值不同，前者为 @，后者为 %
+        if (valItem.blockId == 0) {
+            product += "store " + valItem.vType + " "
+                    + node.getChildAt(2).data.value + ", "
+                    + valItem.vType + "* @" + val + "\n";
+        } else {
+            product += "store " + valItem.vType + " "
+                    + node.getChildAt(2).data.value + ", "
+                    + valItem.vType + "* " + "%" + valItem.regId + "\n";
         }
     }
 
-    private void genCond(TreeNode<NodeData> node) {
+    /**
+     * 处理 Stmt 节点的候选式 'if' '(' Cond ')' Stmt
+     *
+     * @param node Stmt节点
+     */
+    private void visitIfStmt(TreeNode<NodeData> node) {
+        visit(node.getChildAt(2));
+        product += "br i1 " + node.getChildAt(2).data.value
+                + ", label ";
+        int len = product.length();
+        int reg_1 = (regId++);
+        product += "\n" + reg_1 + ":\n";
+        visit(node.getChildAt(4));
+        int reg_2 = (regId++);
+        if (!hasRet())
+            product += "br label %" + reg_2 + "\n";
+        product += "\n" + reg_2 + ":\n";
+        insRecord(len, "%" + reg_1 + ", label %" + reg_2 + "\n");
+    }
+
+    /**
+     * 处理 Stmt 节点的候选式 'if' '(' Cond ')' Stmt 'else' Stmt
+     *
+     * @param node Stmt节点
+     */
+    private void visitIfElseStmt(TreeNode<NodeData> node) {
+        visit(node.getChildAt(2));
+        product += "br i1 " + node.getChildAt(2).data.value + ", label ";
+        int len_1 = product.length();
+        int reg_1 = (regId++);
+        product += "\n" + reg_1 + ":\n";
+        visit(node.getChildAt(4));
+        int len_2 = product.length();
+        int reg_2 = (regId++);
+        product += "\n" + reg_2 + ":\n";
+        visit(node.getChildAt(6));
+        int reg_3 = (regId++);
+        product += "\n" + reg_3 + ":\n";
+        insRecord(len_1, "%" + reg_1 + ", label %" + reg_2 + "\n");
+    }
+
+    /**
+     * 处理 Stmt 节点的候选式 'while' '(' Cond ')' Stmt
+     *
+     * @param node Stmt节点
+     */
+    private void visitWhileStmt(TreeNode<NodeData> node) {
+        stk.push(new Recorder());
+
+        int reg_1 = (regId++);
+        product += "br label %" + reg_1 + "\n";
+        product += "\n" + reg_1 + ":\n";
+        visit(node.getChildAt(2));
+        product += "br i1 " + node.getChildAt(2).data.value
+                + ", label ";
+        int len = product.length();
+        int reg_2 = (regId++);
+        product += "\n" + reg_2 + ":\n";
+        visit(node.getChildAt(4));
+
+        if (!hasRet())
+            product += "br label %" + reg_1 + "\n";
+        int reg_3 = (regId++);
+        product += "\n" + reg_3 + ":\n";
+        insRecord(len, "%" + reg_2 + ", label %" + reg_3 + "\n");
+
+        for (var mark : stk.peek().marks) {
+            if (mark.tag.startsWith("break")) {
+                repRecord(mark.tag, "br label %" + reg_3 + "\n");
+            } else if (mark.tag.startsWith("continue")) {
+                repRecord(mark.tag, "br label %" + reg_1 + "\n");
+            }
+        }
+        stk.pop();
+    }
+
+    private void visitStmt(TreeNode<NodeData> node) {
+        switch (node.children.size()) {
+            case 1 -> visitBlockStmt(node);
+            case 2 -> {
+                switch (node.getChildAt(0).data.name) {
+                    case "Break" -> visitBreakStmt(node);
+                    case "Continue" -> visitContinueStmt(node);
+                    case "Expr" -> visitExprStmt(node);
+                }
+            }
+            case 3 -> {
+                if (node.getChildAt(0).data.name.equals("Return"))
+                    visitRetExpr(node);
+            }
+            case 4 -> visitAlignExpr(node);
+            case 5 -> {
+                switch (node.getChildAt(0).data.name) {
+                    case "If" -> visitIfStmt(node);
+                    case "While" -> visitWhileStmt(node);
+                }
+            }
+            case 7 -> visitIfElseStmt(node);
+        }
+    }
+
+    private void visitCond(TreeNode<NodeData> node) {
         for (TreeNode<NodeData> child : node.children)
-            generate(child);
+            visit(child);
         node.data.value = node.getChildAt(0).data.value;
     }
 
-    private void genExpr(TreeNode<NodeData> node) {
+    private void visitExpr(TreeNode<NodeData> node) {
         for (TreeNode<NodeData> child : node.children)
-            generate(child);
+            visit(child);
         node.data.value = node.getChildAt(0).data.value;
         node.data.intValue = node.getChildAt(0).data.intValue;
     }
 
-    private void genOperaExpr(TreeNode<NodeData> node) {
+    private void visitOperaExpr(TreeNode<NodeData> node) {
         if (analyzer.curBlockId == 0) {
-            generate(node.getChildAt(0));
+            visit(node.getChildAt(0));
             // 计算实际值
             Integer v1 = node.getChildAt(0).data.intValue;
             Integer v2 = v1;
             if (v1 == null) return;
             for (int i = 2; i < node.children.size(); i+=2) {
-                generate(node.getChildAt(i));
+                visit(node.getChildAt(i));
                 Integer v_temp = node.getChildAt(i).data.intValue;
                 if (v_temp == null) return;
                 switch (node.getChildAt(i-1).data.value) {
@@ -352,11 +410,11 @@ public class Generator {
             }
             node.data.intValue = v2;
         } else {
-            generate(node.getChildAt(0));
+            visit(node.getChildAt(0));
             String value_1 = node.getChildAt(0).data.value;
             String value_2 = node.getChildAt(0).data.value;
             for (int i = 2; i < node.children.size(); i+=2) {
-                generate(node.getChildAt(i));
+                visit(node.getChildAt(i));
                 value_2 = "%" + (regId++);
                 product += value_2 + " = "
                         + flagOfOpera(node.getChildAt(i-1).data.value)
@@ -368,8 +426,8 @@ public class Generator {
         }
     }
 
-    private void genCmpExpr(TreeNode<NodeData> node) {
-        generate(node.getChildAt(0));
+    private void visitCmpExpr(TreeNode<NodeData> node) {
+        visit(node.getChildAt(0));
         String value_1 = node.getChildAt(0).data.value;
         String value_2 = node.getChildAt(0).data.value;
         int childCnt = node.children.size();
@@ -380,7 +438,7 @@ public class Generator {
                     + ", 0\n";
         }
         for (int i = 2; i < childCnt; i+=2) {
-            generate(node.getChildAt(i));
+            visit(node.getChildAt(i));
             value_2 = "%" + (regId++);
             product += value_2 + " = icmp "
                     + flagOfOpera(node.getChildAt(i-1).data.value)
@@ -391,12 +449,12 @@ public class Generator {
         node.data.value = value_2;
     }
 
-    private void genLogicExpr(TreeNode<NodeData> node) {
-        generate(node.getChildAt(0));
+    private void visitLogicExpr(TreeNode<NodeData> node) {
+        visit(node.getChildAt(0));
         String value_1 = node.getChildAt(0).data.value;
         String value_2 = node.getChildAt(0).data.value;
         for (int i = 2; i < node.children.size(); i+=2) {
-            generate(node.getChildAt(i));
+            visit(node.getChildAt(i));
             value_2 = "%" + (regId++);
             product += value_2 + " = "
                     + flagOfOpera(node.getChildAt(i-1).data.value)
@@ -407,106 +465,134 @@ public class Generator {
         node.data.value = value_2;
     }
 
-    private void genUnaryExpr(TreeNode<NodeData> node) {
-        switch (node.children.size()) {
-            case 1 -> {
-                genPrimExpr(node.getChildAt(0));
-                node.data.value = node.getChildAt(0).data.value;
-                node.data.intValue = node.getChildAt(0).data.intValue;
-            }
-            case 2 -> {
-                genUnaryExpr(node.getChildAt(1));
-                if (analyzer.curBlockId > 0)
-                    node.data.value = "%" + (regId++);
-                String opera = node.getChildAt(0).getChildAt(0).data.value;
-                switch (opera) {
-                    case "+", "-" -> {
-                        if (analyzer.curBlockId > 0)
-                            product += node.data.value + " = "
-                                    + flagOfOpera(opera)
-                                    + " i32 0, "
-                                    + node.getChildAt(1).data.value + "\n";
-                        // 计算实际值
-                        Integer v = node.getChildAt(1).data.intValue;
-                        if (v != null) {
-                            if (opera.equals("+"))
-                                node.data.intValue = node.getChildAt(1).data.intValue;
-                            else node.data.intValue = - node.getChildAt(1).data.intValue;
-                        }
+    /**
+     * 处理 UnaryExpr 节点的候选式 PrimaryExp
+     *
+     * @param node UnaryExpr节点
+     */
+    private void visitPrimUE(TreeNode<NodeData> node) {
+        visit(node.getChildAt(0));
+        node.data.value = node.getChildAt(0).data.value;
+        node.data.intValue = node.getChildAt(0).data.intValue;
+    }
 
-                    }
-                    case "!" -> {
-                        product += node.data.value + " = icmp eq i32 0, "
-                                + node.getChildAt(1).data.value + "\n";
-                        String newValue = "%" + (regId++);
-                        product += newValue + " = zext i1 "
-                                + node.data.value
-                                + " to i32\n";
-                        node.data.value = newValue;
-                    }
+    /**
+     * 处理 UnaryExpr 节点的候选式 Ident '(' [FuncRParams] ')'
+     *
+     * @param node UnaryExpr节点
+     */
+    private void visitFuncUE(TreeNode<NodeData> node) {
+        String funcName = node.getChildAt(0).data.value;
+        Item funcItem = symTable.getItem(funcName);
+        if (funcItem.vType == Item.ValueType.INT) {
+            String reg = "%" + (regId++);
+            node.data.value = reg;
+            product += reg + " = ";
+        }
+        visit(node.getChildAt(2));
+        product += "call " + funcItem.vType
+                + " @" + funcName
+                + "("
+                + node.getChildAt(2).data.value
+                + ")\n";
+    }
+
+    /**
+     * 处理 UnaryExpr 节点的候选式 Ident '(' ')'
+     *
+     * @param node UnaryExpr节点
+     */
+    private void visitNoParamFuncUE(TreeNode<NodeData> node) {
+        String funcName = node.getChildAt(0).data.value;
+        Item funcItem = symTable.getItem(funcName);
+        if (funcItem.vType == Item.ValueType.INT) {
+            String reg = "%" + (regId++);
+            node.data.value = reg;
+            product += reg + " = ";
+        }
+        product += "call " + funcItem.vType.toString()
+                + " @" + funcName
+                + "("
+                + ")\n";
+    }
+
+    /**
+     * 处理 UnaryExpr 节点的候选式 UnaryOp UnaryExp
+     *
+     * @param node UnaryExpr节点
+     */
+    private void visitSignValUE(TreeNode<NodeData> node) {
+        visitUnaryExpr(node.getChildAt(1));
+        if (analyzer.curBlockId > 0)
+            node.data.value = "%" + (regId++);
+        String opera = node.getChildAt(0).getChildAt(0).data.value;
+        switch (opera) {
+            case "+", "-" -> {
+                if (analyzer.curBlockId > 0)
+                    product += node.data.value + " = "
+                            + flagOfOpera(opera)
+                            + " i32 0, "
+                            + node.getChildAt(1).data.value + "\n";
+                // 计算实际值
+                Integer v = node.getChildAt(1).data.intValue;
+                if (v != null) {
+                    if (opera.equals("+"))
+                        node.data.intValue = node.getChildAt(1).data.intValue;
+                    else node.data.intValue = - node.getChildAt(1).data.intValue;
                 }
+
             }
-            case 3 -> {
-                String funcName = node.getChildAt(0).data.value;
-                Item funcItem = symTable.getItem(funcName);
-                if (funcItem.vType == Item.ValueType.INT) {
-                    String reg = "%" + (regId++);
-                    node.data.value = reg;
-                    product += reg + " = ";
-                }
-                product += "call " + funcItem.vType.toString()
-                        + " @" + funcName
-                        + "("
-                        + ")\n";
-            }
-            case 4 -> {
-                String funcName = node.getChildAt(0).data.value;
-                Item funcItem = symTable.getItem(funcName);
-                if (funcItem.vType == Item.ValueType.INT) {
-                    String reg = "%" + (regId++);
-                    node.data.value = reg;
-                    product += reg + " = ";
-                }
-                generate(node.getChildAt(2));
-                product += "call " + funcItem.vType
-                        + " @" + funcName
-                        + "("
-                        + node.getChildAt(2).data.value
-                        + ")\n";
+            case "!" -> {
+                product += node.data.value + " = icmp eq i32 0, "
+                        + node.getChildAt(1).data.value + "\n";
+                String newValue = "%" + (regId++);
+                product += newValue + " = zext i1 "
+                        + node.data.value
+                        + " to i32\n";
+                node.data.value = newValue;
             }
         }
     }
 
-    private void genPrimExpr(TreeNode<NodeData> node) {
+    private void visitUnaryExpr(TreeNode<NodeData> node) {
+        switch (node.children.size()) {
+            case 1 -> visitPrimUE(node);
+            case 2 -> visitSignValUE(node);
+            case 3 -> visitNoParamFuncUE(node);
+            case 4 -> visitFuncUE(node);
+        }
+    }
+
+    private void visitPrimExpr(TreeNode<NodeData> node) {
         int childCnt = node.children.size();
         if (childCnt == 1) {
             if (node.getChildAt(0).data.name.equals("Number")) {
                 node.data.value = node.getChildAt(0).data.value;
                 node.data.intValue = Integer.parseInt(node.data.value);
             } else if (node.getChildAt(0).data.name.equals("Lval")) {
-                generate(node.getChildAt(0));
+                visit(node.getChildAt(0));
                 node.data.value = node.getChildAt(0).data.value;
                 node.data.intValue = node.getChildAt(0).data.intValue;
             }
         } else {
-            generate(node.getChildAt(1));
+            visit(node.getChildAt(1));
             node.data.value = node.getChildAt(1).data.value;
             node.data.intValue = node.getChildAt(1).data.intValue;
         }
     }
 
-    private void genFuncRParams(TreeNode<NodeData> node) {
+    private void visitFuncRParams(TreeNode<NodeData> node) {
         int childCnt = node.children.size();
         String value = "";
         for (int i = 0; i < childCnt; i += 2) {
             if (i >= 1) value += ",";
-            generate(node.getChildAt(i));
+            visit(node.getChildAt(i));
             value += "i32 " + node.getChildAt(i).data.value;
         }
         node.data.value = value;
     }
 
-    private void genRLval(TreeNode<NodeData> node) {
+    private void visitRLval(TreeNode<NodeData> node) {
         if (analyzer.curBlockId == 0) {
             String val = node.getChildAt(0).data.value;
             Item valItem = symTable.getItem(val);
