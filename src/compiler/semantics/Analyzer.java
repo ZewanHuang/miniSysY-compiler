@@ -3,8 +3,8 @@ package compiler.semantics;
 import compiler.parser.ast.NodeData;
 import compiler.parser.ast.TreeNode;
 import compiler.semantics.symtable.Item;
-import compiler.semantics.symtable.Item.ValueType;
 import compiler.semantics.symtable.Item.IdentType;
+import compiler.semantics.symtable.Item.ValueType;
 import compiler.semantics.symtable.SymTable;
 
 import java.util.Stack;
@@ -28,46 +28,6 @@ public class Analyzer {
         this.blockStack.push(0);
     }
 
-    public Analyzer(TreeNode<NodeData> tree) {
-        this(tree, new SymTable());
-    }
-
-    /**
-     * 构建并返回符号表
-     *
-     * @return 符号表
-     */
-    public SymTable buildTable() {
-        traversal(ast);
-        return symTable;
-    }
-
-    /**
-     * 递归遍历语法树，记录符号表，执行语义分析
-     *
-     * @param node 树节点
-     */
-    private void traversal(TreeNode<NodeData> node) {
-        if (node.data.name.equals("ConstInitVal") && !isConstInitVal(node))
-            error();
-        if (node.data.name.equals("Lval") && !isLvalValid(node))
-            error();
-        if (node.data.name.equals("UnaryExpr") && node.children.size()>=3 && !isFuncCallValid(node))
-            error();
-        if (node.data.name.equals("InitVal")) {     // 全局变量也要求 InitVal 为常量表达式
-            TreeNode<NodeData> parent = node;
-            while (!parent.data.name.equals("VarDef"))
-                parent = node.parent;
-            if (symTable.getItem(parent.getChildAt(0).data.value).blockId == 0 && !isConstInitVal(node))
-                error();
-        }
-
-        handleBlock(node);
-        register(node);
-        for (TreeNode<NodeData> child : node.children)
-            traversal(child);
-    }
-
     /**
      * 进入 block 时 blockId 加一，退出时符号置为无效，blockId 减一
      *
@@ -87,42 +47,70 @@ public class Analyzer {
     }
 
     /**
-     * 登记标识符到符号表中
+     * 登记函数定义到符号表
      *
-     * @param node 语法树的当前节点
+     * @param node FuncDef节点
      */
-    public void register(TreeNode<NodeData> node) {
+    public void filFuncDef(TreeNode<NodeData> node) {
         TreeNode<NodeData> ident;
-        switch (node.data.name) {
-            case "FuncDef" -> {
-                ident = node.getChildAt(1);
-                if (!symTable.isAvailDecl(ident.data.value, curBlockId)) // 若同区块内该变量名被用，则报错
-                    error();
-                Item.ValueType vtype;
-                if (node.getChildAt(0).getChildAt(0).data.name.equals("Int"))
-                    vtype = Item.ValueType.INT;
-                else
-                    vtype = Item.ValueType.VOID;
-                symTable.insert(ident.data.value, curBlockId, IdentType.FUNC, vtype);
-            }
-            case "ConstDef" -> {
-                ident = node.getChildAt(0);
-                if (!symTable.isAvailDecl(ident.data.value, curBlockId)) // 若同区块内该变量名被用，则报错
-                    error();
-                Item item = symTable.insert(ident.data.value, curBlockId, IdentType.CONST, Item.ValueType.INT);
-                // 查询其叶子节点判断是否有值，若为全局变量则一定有初始化值
-                if (node.children.size() == 3 && hasCerVal(node.getChildAt(2)) || curBlockId == 0)
-                    item.hasCerVal = true;
-            }
-            case "VarDef" -> {
-                ident = node.getChildAt(0);
-                if (!symTable.isAvailDecl(ident.data.value, curBlockId))
-                    error();
-                Item item = symTable.insert(ident.data.value, curBlockId, IdentType.VAL, Item.ValueType.INT);
-                if (node.children.size() == 3 && hasCerVal(node.getChildAt(2)) || curBlockId == 0)
-                    item.hasCerVal = true;
-            }
-        }
+        ident = node.getChildAt(1);
+        if (!symTable.isDeclAvail(ident.data.value, curBlockId)) // 若同区块内该变量名被用，则报错
+            error();
+        Item.ValueType vtype;
+        if (node.getChildAt(0).getChildAt(0).data.name.equals("Int"))
+            vtype = Item.ValueType.INT;
+        else
+            vtype = Item.ValueType.VOID;
+        symTable.insert(ident.data.value, curBlockId, IdentType.FUNC, vtype);
+    }
+
+    /**
+     * 登记常量int变量到符号表
+     *
+     * @param node ConstDef节点
+     */
+    public Item filConstValDef(TreeNode<NodeData> node) {
+        TreeNode<NodeData> ident = node.getChildAt(0);
+        Item item = symTable.insert(ident.data.value, curBlockId, IdentType.CONST, Item.ValueType.INT);
+        // 查询其叶子节点判断是否有值，若为全局变量则一定有初始化值
+        if (node.children.size() == 3 && hasCerVal(node.getChildAt(2)) || curBlockId == 0)
+            item.hasCerVal = true;
+        return item;
+    }
+
+    /**
+     * 登记常量array变量到符号表
+     *
+     * @param node ConstDef节点
+     */
+    public Item filConstArrayDef(TreeNode<NodeData> node) {
+        TreeNode<NodeData> ident = node.getChildAt(0);
+        return symTable.insert(ident.data.value, curBlockId, IdentType.CONST, ValueType.ARRAY);
+    }
+
+    /**
+     * 登记变量array变量到符号表
+     *
+     * @param node ConstDef节点
+     */
+    public Item filVarArrayDef(TreeNode<NodeData> node) {
+        TreeNode<NodeData> ident = node.getChildAt(0);
+        return symTable.insert(ident.data.value, curBlockId, IdentType.CONST, ValueType.ARRAY);
+    }
+
+    /**
+     * 登记非数组变量定义到符号表
+     *
+     * @param node VarDef节点
+     * @return 符号表记录
+     */
+    public Item filVarValDef(TreeNode<NodeData> node) {
+        TreeNode<NodeData> ident = node.getChildAt(0);
+        if (!symTable.isDeclAvail(ident.data.value, curBlockId)) error();
+        Item item = symTable.insert(ident.data.value, curBlockId, IdentType.VAL, Item.ValueType.INT);
+        if (node.children.size() == 3 && hasCerVal(node.getChildAt(2)) || curBlockId == 0)
+            item.hasCerVal = true;
+        return item;
     }
 
     /**
@@ -158,18 +146,46 @@ public class Analyzer {
     }
 
     /**
-     * 判断节点是否为合法的 Lval
+     * 判断节点是否为合法的 NoArrayRLval
      *
      * @param node Lval节点
      * @return 是否符合语义
      */
-    public boolean isLvalValid(TreeNode<NodeData> node) {
+    public boolean isNoArrayLvalValid(TreeNode<NodeData> node) {
         String ident = node.getChildAt(0).data.value;
         Item item = symTable.getItem(ident);
         if (node.parent.data.name.equals("Stmt"))
             return item != null && item.iType == IdentType.VAL;
         else
             return item != null && (item.iType == IdentType.VAL || item.iType == IdentType.CONST);
+    }
+
+    /**
+     * 判断节点是否为合法的 ArrayLval
+     *
+     * @param node Lval节点
+     * @return 是否符合语义
+     */
+    public boolean isArrayLvalValid(TreeNode<NodeData> node) {
+        boolean isValid;
+        String ident = node.getChildAt(0).data.value;
+        Item item = symTable.getItem(ident);
+        if (node.parent.data.name.equals("Stmt"))
+            isValid = (item != null && item.iType == IdentType.VAL
+                    && item.vType == ValueType.ARRAY);
+        else
+            isValid = (item != null &&
+                    (item.iType == IdentType.VAL || item.iType == IdentType.CONST)
+                    && item.vType == ValueType.ARRAY);
+
+        int cnt_exp = 0;
+        for (TreeNode<NodeData> child : node.children)
+            if (child.data.name.equals("Expr"))
+                cnt_exp++;
+        String identName = node.getChildAt(0).data.value;
+        Item arrayItem = symTable.getItem(identName);
+        if (arrayItem.arraySize.size() != cnt_exp) isValid = false;
+        return isValid;
     }
 
     /**

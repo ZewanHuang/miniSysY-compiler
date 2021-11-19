@@ -9,6 +9,8 @@ import compiler.semantics.symtable.SymTable;
 import java.util.ArrayList;
 import java.util.Stack;
 
+import static compiler.exception.CompileException.error;
+
 
 public class Generator {
 
@@ -55,6 +57,8 @@ public class Generator {
                 declare void @putint(i32)
                 declare i32 @getch()
                 declare void @putch(i32)
+                declare i32 @getarray(i32*)
+                declare void @putarray(i32, i32*)
                 """;
         this.symTable = new SymTable();
         this.analyzer = new Analyzer(ast, symTable);
@@ -81,13 +85,12 @@ public class Generator {
      */
     private void visit(TreeNode<NodeData> node) {
         analyzer.handleBlock(node);
-        analyzer.register(node);
         switch (node.data.name) {
             case "FuncDef" -> visitFuncDef(node);
             case "Block" -> visitBlock(node);
             case "ConstDef" -> visitConstDef(node);
             case "ConstInitVal" -> visitConstInitVal(node);
-            case "ConstExp" -> visitConstExp(node);
+            case "ConstExpr" -> visitConstExp(node);
             case "VarDef" -> visitVarDef(node);
             case "InitVal" -> visitInitVal(node);
             case "Stmt" -> visitStmt(node);
@@ -96,7 +99,7 @@ public class Generator {
             case "UnaryExpr" -> visitUnaryExpr(node);
             case "PrimaryExpr" -> visitPrimExpr(node);
             case "FuncRParams" -> visitFuncRParams(node);
-            case "Lval" -> visitRLval(node);
+            case "Lval" -> visitLval(node);
             case "Cond" -> visitCond(node);
             case "RelExpr", "EqExpr" -> visitCmpExpr(node);
             case "LAndExpr", "LOrExpr" -> visitLogicExpr(node);
@@ -113,6 +116,7 @@ public class Generator {
      * @param node FuncDef节点
      */
     private void visitFuncDef(TreeNode<NodeData> node) {
+        analyzer.filFuncDef(node);
         String funcName = node.getChildAt(1).data.value;
         Item funcItem = symTable.getItem(funcName);
         product += "define dso_local " + funcItem.vType + " @" + funcName + "() {\n";
@@ -125,10 +129,10 @@ public class Generator {
             visit(child);
     }
 
-    private void visitConstDef(TreeNode<NodeData> node) {
+    private void visitConstValDef(TreeNode<NodeData> node) {
+        Item declItem = analyzer.filConstValDef(node);
         String declName = node.getChildAt(0).data.value;
-        Item declItem = symTable.getItem(declName);
-        // 全局变量求值，局部变量声明不求值
+
         if (declItem.blockId == 0) {
             visit(node.getChildAt(2));
             product += "@" + declName + " = dso_local global i32 "
@@ -152,10 +156,57 @@ public class Generator {
         declItem.intValue = node.getChildAt(2).data.intValue;
     }
 
-    private void visitConstInitVal(TreeNode<NodeData> node) {
+    private void visitConstArrayDef(TreeNode<NodeData> node) {
+        Item declItem = analyzer.filConstArrayDef(node);
+
+        for (TreeNode<NodeData> child : node.children) {
+            if (child.data.name.equals("ConstExpr")) {
+                visit(child);
+                if (child.data.intValue < 0) error();
+                declItem.arraySize.add(child.data.intValue);
+            }
+        }
+
+        // '=' ConstInitVal
+        visit(node.getChildAt(node.children.size()-1));
+    }
+
+    private void visitConstDef(TreeNode<NodeData> node) {
+        TreeNode<NodeData> ident = node.getChildAt(0);
+        if (!symTable.isDeclAvail(ident.data.value, analyzer.curBlockId)) // 若同区块内该变量名被用，则报错
+            error();
+
+        if (node.children.size() == 3) visitConstValDef(node);
+        else visitConstArrayDef(node);
+    }
+
+    private void visitConstInitValNonArray(TreeNode<NodeData> node) {
+        if (!analyzer.isConstInitVal(node))
+            error();
         visit(node.getChildAt(0));
         node.data.value = node.getChildAt(0).data.value;
         node.data.intValue = node.getChildAt(0).data.intValue;
+    }
+
+    private void visitConstInitArray(TreeNode<NodeData> node) {
+        /*
+         * TODO: 初始化
+         * 1. 只有花括号则全部初始化为 0
+         * 2. 初始化和维度完全对应则一一对应
+         * 3. 初始化值少于维度个数，其余隐式初始化为 0
+         */
+        if (analyzer.curBlockId == 0) {
+            if (!analyzer.isConstInitVal(node)) error();
+        } else {
+            if (!analyzer.hasCerVal(node)) error();
+        }
+    }
+
+    private void visitConstInitVal(TreeNode<NodeData> node) {
+        if (node.children.size() == 1)
+            visitConstInitValNonArray(node);
+        else
+            visitConstInitArray(node);
     }
 
     private void visitConstExp(TreeNode<NodeData> node) {
@@ -164,9 +215,9 @@ public class Generator {
         node.data.intValue = node.getChildAt(0).data.intValue;
     }
 
-    private void visitVarDef(TreeNode<NodeData> node) {
+    private void visitVarValDef(TreeNode<NodeData> node) {
         String declName = node.getChildAt(0).data.value;
-        Item declItem = symTable.getItem(declName);
+        Item declItem = analyzer.filVarValDef(node);
 
         if (declItem.blockId == 0) {
             if (node.children.size() == 1) {
@@ -200,10 +251,52 @@ public class Generator {
         node.data.intValue = declItem.intValue;
     }
 
-    private void visitInitVal(TreeNode<NodeData> node) {
+    private void visitVarArrayDef(TreeNode<NodeData> node) {
+        Item declItem = analyzer.filVarArrayDef(node);
+
+        boolean hasInitVal = false;
+        for (TreeNode<NodeData> child : node.children) {
+            if (child.data.name.equals("ConstExpr")) {
+                visit(child);
+                if (child.data.intValue < 0) error();
+                declItem.arraySize.add(child.data.intValue);
+            }
+            if (child.data.name.equals("InitVal"))
+                hasInitVal = true;
+        }
+        // '=' InitVal
+        if (hasInitVal)
+            visit(node.getChildAt(node.children.size()-1));
+    }
+
+    private void visitVarDef(TreeNode<NodeData> node) {
+        boolean isArray = false;
+        for (TreeNode<NodeData> child : node.children)
+            if (child.data.value.equals("[")) {
+                isArray = true;
+                break;
+            }
+        if (isArray) visitVarArrayDef(node);
+        else visitVarValDef(node);
+    }
+
+    private void visitInitVarVal(TreeNode<NodeData> node) {
         visit(node.getChildAt(0));
         node.data.value = node.getChildAt(0).data.value;
         node.data.intValue = node.getChildAt(0).data.intValue;
+    }
+
+    private void visitInitArrayVal(TreeNode<NodeData> node) {
+        for (TreeNode<NodeData> child : node.children)
+            visit(child);
+    }
+
+    private void visitInitVal(TreeNode<NodeData> node) {
+        if (analyzer.curBlockId == 0 && !analyzer.isConstInitVal(node))
+            error();
+
+        if (node.children.size() == 1) visitInitVarVal(node);
+        else visitInitArrayVal(node);
     }
 
     /**
@@ -264,7 +357,8 @@ public class Generator {
      * @param node Stmt节点
      */
     private void visitAlignExpr(TreeNode<NodeData> node) {
-        String val = node.getLeaves().get(0).data.value;
+        visit(node.getChildAt(0));
+        String val = node.getChildAt(0).data.value;
         Item valItem = symTable.getItem(val);
         visit(node.getChildAt(2));
         // 全局变量和局部变量的赋值不同，前者为 @，后者为 %
@@ -398,7 +492,9 @@ public class Generator {
     }
 
     private void visitOperaExpr(TreeNode<NodeData> node) {
+        boolean computed = false;
         if (analyzer.curBlockId == 0 || analyzer.hasCerVal(node)) {
+            computed = true;
             visit(node.getChildAt(0));
             // 计算实际值
             Integer v1 = node.getChildAt(0).data.intValue;
@@ -420,11 +516,11 @@ public class Generator {
             node.data.intValue = v2;
         }
         if (analyzer.curBlockId > 0) {
-            visit(node.getChildAt(0));
+            if (!computed) visit(node.getChildAt(0));
             String value_1 = node.getChildAt(0).data.value;
             String value_2 = node.getChildAt(0).data.value;
             for (int i = 2; i < node.children.size(); i+=2) {
-                visit(node.getChildAt(i));
+                if (!computed) visit(node.getChildAt(i));
                 value_2 = "%" + (regId++);
                 product += value_2 + " = "
                         + flagOfOpera(node.getChildAt(i-1).data.value)
@@ -565,6 +661,8 @@ public class Generator {
     }
 
     private void visitUnaryExpr(TreeNode<NodeData> node) {
+        if (node.children.size() >= 3 && !analyzer.isFuncCallValid(node))
+            error();
         switch (node.children.size()) {
             case 1 -> visitPrimUE(node);
             case 2 -> visitSignValUE(node);
@@ -602,27 +700,45 @@ public class Generator {
         node.data.value = value;
     }
 
-    private void visitRLval(TreeNode<NodeData> node) {
-        if (analyzer.curBlockId == 0) {
-            String val = node.getChildAt(0).data.value;
-            Item valItem = symTable.getItem(val);
-            // 计算值
-            if (valItem.hasCerVal)
-                node.data.intValue = valItem.intValue;
-        } else {
+    private void visitNoArrayRLval(TreeNode<NodeData> node) {
+        String val = node.getChildAt(0).data.value;
+        Item valItem = symTable.getItem(val);
+        // 计算值
+        if (analyzer.curBlockId == 0 || valItem.hasCerVal)
+            node.data.intValue = valItem.intValue;
+        if (analyzer.curBlockId > 0) {
             String rLval = "%" + (regId++);
             node.data.value = rLval;
-            String val = node.getChildAt(0).data.value;
-            Item valItem = symTable.getItem(val);
-            // 能计算值则计算值
-            if (valItem.hasCerVal)
-                node.data.intValue = valItem.intValue;
             product += rLval + " = load " + valItem.vType
                     + ", " + valItem.vType + "* ";
             if (valItem.blockId == 0)
                 product += "@" + valItem.name + "\n";
             else
                 product += "%" + valItem.regId + "\n";
+        }
+    }
+
+    private void visitArrayRLval(TreeNode<NodeData> node) {
+
+    }
+
+    private void visitLval(TreeNode<NodeData> node) {
+        if (node.children.size() == 1) {
+            if (!analyzer.isNoArrayLvalValid(node)) error();
+            if (node.parent.data.name.equals("Stmt")) {
+                // Stmt -> Lval = Exp ; --- Lval -> Ident
+                node.data.value = node.getChildAt(0).data.value;
+            } else {
+                visitNoArrayRLval(node);
+            }
+        } else {
+            if (!analyzer.isArrayLvalValid(node))
+                error();
+            if (node.parent.data.name.equals("Stmt")) {
+                // Stmt -> Lval = Exp ; --- Lval -> Ident {'[' Exp ']'}
+            } else {
+                visitArrayRLval(node);
+            }
         }
     }
 

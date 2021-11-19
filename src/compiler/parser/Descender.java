@@ -580,6 +580,7 @@ public class Descender {
             while (curToken.equals("[")) {
                 ast = node.addChild(new NodeData(curToken));
                 nextToken();
+                ast = node.addChild(new NodeData("Expr"));
                 expr();
                 if (curToken.equals("]")) {
                     ast = node.addChild(new NodeData(curToken));

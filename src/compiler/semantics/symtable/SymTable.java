@@ -1,7 +1,6 @@
 package compiler.semantics.symtable;
 
 import java.util.ArrayList;
-import java.util.Stack;
 
 public class SymTable {
     public ArrayList<Item> symTable;
@@ -30,8 +29,8 @@ public class SymTable {
      */
     public String toString() {
         StringBuilder table = new StringBuilder();
-        table.append(String.format("%15s %10s %10s %12s %12s %10s %10s\n",
-                "name", "iType", "vType", "hasCerVal", "intValue", "blockId", "isValid"));
+        table.append(String.format("%15s %10s %10s %12s %12s %10s %10s %20s\n",
+                "name", "iType", "vType", "hasCerVal", "intValue", "blockId", "isValid", "arrayShape"));
         for (Item item : symTable)
             table.append(item.toString()).append("\n");
         return table.toString();
@@ -79,13 +78,13 @@ public class SymTable {
         return item;
     }
 
-    public boolean isAvailDecl(String name, int curBlockId) {
+    public boolean isDeclAvail(String name, int curBlockId) {
         Item item = getItem(name);
         return item == null || item.blockId != curBlockId;
     }
 
     /**
-     * 将作用域ID为 blockId 的变量定义设置为无效
+     * 将作用域 ID为 blockId 的变量定义设置为无效
      *
      * @param blockId 作用域ID
      */

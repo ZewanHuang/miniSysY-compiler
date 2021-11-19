@@ -9,21 +9,21 @@ public class Item {
      * 标识符类型
      */
     public enum IdentType {
-        VAL, CONST, FUNC, ARRAY, PARAM
+        VAL, CONST, FUNC, PARAM
     }
 
     /**
      * 标识符存储值的类型
      */
     public enum ValueType {
-        INT, REAL, CHAR, POINTER, VOID;
+        INT, REAL, CHAR, ARRAY, VOID;
 
         public String toString() {
             return switch (this) {
                 case INT -> "i32";
                 case REAL -> "real";
                 case CHAR -> "char";
-                case POINTER -> "pointer";
+                case ARRAY -> "pointer";
                 case VOID -> "void";
             };
         }
@@ -38,6 +38,7 @@ public class Item {
     public ArrayList<String> funcParams;    /* 函数参数列表 */
     public int regId;                       /* 寄存器ID */
     public Integer intValue;                /* 编译时可求值 */
+    public ArrayList<Integer> arraySize;    /* 数组长度 */
 
     public Item(String name, int blockId , IdentType iType, ValueType vType) {
         this.name = name;
@@ -46,6 +47,7 @@ public class Item {
         this.vType = vType;
         this.isValid = true;
         this.funcParams = new ArrayList<>();
+        this.arraySize = new ArrayList<>();
     }
 
     public Item(String name, int blockId , IdentType iType, ValueType vType, ArrayList<String> funcParams) {
@@ -55,6 +57,7 @@ public class Item {
         this.vType = vType;
         this.isValid = true;
         this.funcParams = funcParams;
+        this.arraySize = new ArrayList<>();
     }
 
     public static Item GETINT = new Item("getint",0, IdentType.FUNC, ValueType.INT, new ArrayList<>());
@@ -69,7 +72,7 @@ public class Item {
             new Item("putarray",0, IdentType.FUNC, ValueType.VOID, new ArrayList<>(Arrays.asList("int", "int[]")));
 
     public String toString() {
-        return String.format("%15s %10s %10s %12s %12d %10d %10s",
-                name, iType, vType, hasCerVal, intValue, blockId, isValid);
+        return String.format("%15s %10s %10s %12s %12d %10d %10s %20s",
+                name, iType, vType, hasCerVal, intValue, blockId, isValid, arraySize.toString());
     }
 }

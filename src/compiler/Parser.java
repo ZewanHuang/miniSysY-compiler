@@ -55,7 +55,6 @@ public class Parser {
         tokens.add(new Token());
         Descender descender = new Descender(tokens);
         TreeNode<NodeData> ast = descender.buildAST();
-        new Analyzer(ast).buildTable();
         Generator generator = new Generator(ast);
         generator.generate();
         return generator.getSymTable().toString();
@@ -68,7 +67,6 @@ public class Parser {
         tokens.add(new Token());
         Descender descender = new Descender(tokens);
         TreeNode<NodeData> ast = descender.buildAST();
-        new Analyzer(ast).buildTable();
         Generator generator = new Generator(ast);
         Optimizer optimizer = new Optimizer(generator.generate());
         return optimizer.optim();
