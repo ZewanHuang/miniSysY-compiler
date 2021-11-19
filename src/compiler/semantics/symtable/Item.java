@@ -69,6 +69,7 @@ public class Item {
             new Item("putarray",0, IdentType.FUNC, ValueType.VOID, new ArrayList<>(Arrays.asList("int", "int[]")));
 
     public String toString() {
-        return String.format("%15s %10s %10s %12s %10d %10s", name, iType, vType, hasCerVal, blockId, isValid);
+        return String.format("%15s %10s %10s %12s %12d %10d %10s",
+                name, iType, vType, hasCerVal, intValue, blockId, isValid);
     }
 }

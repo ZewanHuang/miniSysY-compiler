@@ -54,8 +54,11 @@ public class Parser {
         ArrayList<Token> tokens = scanner.dumpTokens();
         tokens.add(new Token());
         Descender descender = new Descender(tokens);
-        Analyzer analyzer = new Analyzer(descender.buildAST());
-        return analyzer.buildTable().toString();
+        TreeNode<NodeData> ast = descender.buildAST();
+        new Analyzer(ast).buildTable();
+        Generator generator = new Generator(ast);
+        generator.generate();
+        return generator.getSymTable().toString();
     }
 
 

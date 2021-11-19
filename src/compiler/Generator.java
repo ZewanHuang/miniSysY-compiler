@@ -60,6 +60,10 @@ public class Generator {
         this.analyzer = new Analyzer(ast, symTable);
     }
 
+    public SymTable getSymTable() {
+        return this.symTable;
+    }
+
     /**
      * 生成 llvm 并返回生成代码
      *
@@ -144,6 +148,7 @@ public class Generator {
                         + declItem.vType + "* " + decl + "\n";
             }
         }
+        node.data.intValue = node.getChildAt(2).data.intValue;
         declItem.intValue = node.getChildAt(2).data.intValue;
     }
 
@@ -192,6 +197,7 @@ public class Generator {
                 declItem.intValue = node.getChildAt(2).data.intValue;
             }
         }
+        node.data.intValue = declItem.intValue;
     }
 
     private void visitInitVal(TreeNode<NodeData> node) {
@@ -392,7 +398,7 @@ public class Generator {
     }
 
     private void visitOperaExpr(TreeNode<NodeData> node) {
-        if (analyzer.curBlockId == 0) {
+        if (analyzer.curBlockId == 0 || analyzer.hasCerVal(node)) {
             visit(node.getChildAt(0));
             // 计算实际值
             Integer v1 = node.getChildAt(0).data.intValue;
@@ -412,7 +418,8 @@ public class Generator {
                 v1 = v2;
             }
             node.data.intValue = v2;
-        } else {
+        }
+        if (analyzer.curBlockId > 0) {
             visit(node.getChildAt(0));
             String value_1 = node.getChildAt(0).data.value;
             String value_2 = node.getChildAt(0).data.value;

@@ -30,7 +30,8 @@ public class SymTable {
      */
     public String toString() {
         StringBuilder table = new StringBuilder();
-        table.append(String.format("%15s %10s %10s %12s %10s %10s\n", "name", "iType", "vType", "hasCerVal", "blockId", "isValid"));
+        table.append(String.format("%15s %10s %10s %12s %12s %10s %10s\n",
+                "name", "iType", "vType", "hasCerVal", "intValue", "blockId", "isValid"));
         for (Item item : symTable)
             table.append(item.toString()).append("\n");
         return table.toString();
