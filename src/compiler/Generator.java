@@ -562,15 +562,9 @@ public class Generator {
         Item valItem = symTable.getItem(val);
         visit(node.getChildAt(2));
         // 全局变量和局部变量的赋值不同，前者为 @，后者为 %
-        if (valItem.blockId == 0) {
-            product += "store " + valItem.vType + " "
-                    + node.getChildAt(2).data.value + ", "
-                    + valItem.vType + "* @" + val + "\n";
-        } else {
-            product += "store " + valItem.vType + " "
-                    + node.getChildAt(2).data.value + ", "
-                    + valItem.vType + "* " + "%" + valItem.regId + "\n";
-        }
+        product += "store " + valItem.vType + " "
+                + node.getChildAt(2).data.value + ", "
+                + valItem.vType + "* " + node.getChildAt(0).data.value + "\n";
     }
 
     /**
@@ -955,7 +949,11 @@ public class Generator {
             if (!analyzer.isNoArrayLvalValid(node)) error();
             if (node.parent.data.name.equals("Stmt")) {
                 // Stmt -> Lval = Exp ; --- Lval -> Ident
-                node.data.value = node.getChildAt(0).data.value;
+                Item _ident = symTable.getItem(node.getChildAt(0).data.value);
+                if (_ident.blockId == 0)
+                    node.data.value = "@" + _ident.name;
+                else
+                    node.data.value = "%" + _ident.regId;
             } else {
                 visitNoArrayRLval(node);
             }
