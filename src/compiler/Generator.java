@@ -122,8 +122,12 @@ public class Generator {
         String funcName = node.getChildAt(1).data.value;
         Item funcItem = symTable.getItem(funcName);
         product += "define dso_local " + funcItem.vType + " @" + funcName + "() {\n";
-        visit(node.getChildAt(4));
-        product += "}";
+        if (node.children.size() == 5) {
+            visit(node.getChildAt(4));
+        } else {
+            visit(node.getChildAt(5));
+        }
+        product += "}\n\n";
     }
 
     private void visitBlock(TreeNode<NodeData> node) {
