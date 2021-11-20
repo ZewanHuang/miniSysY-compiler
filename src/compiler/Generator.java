@@ -176,7 +176,8 @@ public class Generator {
         for (TreeNode<NodeData> child : node.children) {
             if (child.data.name.equals("ConstExpr")) {
                 visit(child);
-                if (child.data.intValue < 0) error();
+                if (!analyzer.isConstInitVal(child) || child.data.intValue < 0)
+                    error();
                 declItem.arraySize.add(child.data.intValue);
                 size *= child.data.intValue;
             }
@@ -351,7 +352,9 @@ public class Generator {
         for (TreeNode<NodeData> child : node.children) {
             if (child.data.name.equals("ConstExpr")) {
                 visit(child);
-                if (child.data.intValue < 0) error();
+                if (child.data.intValue < 0 ||
+                        (analyzer.curBlockId == 0 && !analyzer.isConstInitVal(child)))
+                    error();
                 declItem.arraySize.add(child.data.intValue);
                 size *= child.data.intValue;
             }
