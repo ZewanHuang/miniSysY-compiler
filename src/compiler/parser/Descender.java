@@ -312,7 +312,7 @@ public class Descender {
                 } else error();
             }
         } else {
-            ast = node.addChild(new NodeData("ConstExp"));
+            ast = node.addChild(new NodeData("ConstExpr"));
             constExp();
         }
     }

@@ -27,4 +27,14 @@ public class StringUtils {
         Pattern pattern = Pattern.compile("^[\\d]*$");
         return pattern.matcher(str).matches();
     }
+
+    /**
+     * 从字符串中删除最后一个字符
+     *
+     * @param value 字符串
+     * @return 删除最后一个字符后的字符串
+     */
+    public static String chop(String value) {
+        return value.substring(0, value.length()-1);
+    }
 }

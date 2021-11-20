@@ -23,7 +23,7 @@ public class Item {
                 case INT -> "i32";
                 case REAL -> "real";
                 case CHAR -> "char";
-                case ARRAY -> "pointer";
+                case ARRAY -> "array";
                 case VOID -> "void";
             };
         }

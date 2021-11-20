@@ -71,6 +71,7 @@ public class Analyzer {
      */
     public Item filConstValDef(TreeNode<NodeData> node) {
         TreeNode<NodeData> ident = node.getChildAt(0);
+        if (!symTable.isDeclAvail(ident.data.value, curBlockId)) error();
         Item item = symTable.insert(ident.data.value, curBlockId, IdentType.CONST, Item.ValueType.INT);
         // 查询其叶子节点判断是否有值，若为全局变量则一定有初始化值
         if (node.children.size() == 3 && hasCerVal(node.getChildAt(2)) || curBlockId == 0)
@@ -85,6 +86,7 @@ public class Analyzer {
      */
     public Item filConstArrayDef(TreeNode<NodeData> node) {
         TreeNode<NodeData> ident = node.getChildAt(0);
+        if (!symTable.isDeclAvail(ident.data.value, curBlockId)) error();
         return symTable.insert(ident.data.value, curBlockId, IdentType.CONST, ValueType.ARRAY);
     }
 
@@ -95,6 +97,7 @@ public class Analyzer {
      */
     public Item filVarArrayDef(TreeNode<NodeData> node) {
         TreeNode<NodeData> ident = node.getChildAt(0);
+        if (!symTable.isDeclAvail(ident.data.value, curBlockId)) error();
         return symTable.insert(ident.data.value, curBlockId, IdentType.CONST, ValueType.ARRAY);
     }
 

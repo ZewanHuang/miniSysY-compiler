@@ -5,6 +5,7 @@ import compiler.parser.ast.TreeNode;
 import compiler.semantics.Analyzer;
 import compiler.semantics.symtable.Item;
 import compiler.semantics.symtable.SymTable;
+import compiler.utils.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Stack;
@@ -59,6 +60,7 @@ public class Generator {
                 declare void @putch(i32)
                 declare i32 @getarray(i32*)
                 declare void @putarray(i32, i32*)
+                declare void @memset(i32*, i32, i32)
                 """;
         this.symTable = new SymTable();
         this.analyzer = new Analyzer(ast, symTable);
@@ -156,19 +158,57 @@ public class Generator {
         declItem.intValue = node.getChildAt(2).data.intValue;
     }
 
+    private boolean hasOnlyPart(TreeNode<NodeData> node) {
+        for (TreeNode<NodeData> leaf : node.getLeaves())
+            if (!leaf.data.value.equals("{") && !leaf.data.value.equals("}"))
+                return false;
+        return true;
+    }
+
+    private ArrayList<Integer> arrayShape;
+
     private void visitConstArrayDef(TreeNode<NodeData> node) {
         Item declItem = analyzer.filConstArrayDef(node);
+        String declName = node.getChildAt(0).data.value;
 
+        boolean hasConstInit = false;
+        int size = 1;
         for (TreeNode<NodeData> child : node.children) {
             if (child.data.name.equals("ConstExpr")) {
                 visit(child);
                 if (child.data.intValue < 0) error();
                 declItem.arraySize.add(child.data.intValue);
+                size *= child.data.intValue;
+            }
+            if (child.data.name.equals("ConstInitVal"))
+                hasConstInit = true;
+        }
+        this.arrayShape = declItem.arraySize;
+
+        TreeNode<NodeData> constInitVal = node.getChildAt(node.children.size()-1);
+
+        // ConstDef -> Ident { '[' ConstExp ']' } '=' ConstInitVal
+        if (analyzer.curBlockId == 0) {
+            product += "@" + declName + " = dso_local constant "
+                    + "[" + size + " x i32] ";
+            if (hasConstInit) {
+                visit(constInitVal);
+                product += "[" + constInitVal.data.value + "]\n";
+            } else {
+                product += "zeroinitializer\n";
+            }
+        } else {
+            declItem.regId = regId;
+            String decl = "%" + (regId++);
+            product += decl + " = alloca [" + size + " x i32]\n";
+            String _reg = "%" + (regId++);
+            product += _reg + " = getelementptr [" + size + " x i32], ["
+                    + size + " x i32]* " + decl + ", i32 0, i32 0\n"
+                    + "call void @memset(i32* " + _reg + ", i32 0, i32 " + 4 * size + ")\n";
+            if (hasConstInit) {
+                visit(constInitVal);
             }
         }
-
-        // '=' ConstInitVal
-        visit(node.getChildAt(node.children.size()-1));
     }
 
     private void visitConstDef(TreeNode<NodeData> node) {
@@ -188,6 +228,38 @@ public class Generator {
         node.data.intValue = node.getChildAt(0).data.intValue;
     }
 
+    private int initDepth(TreeNode<NodeData> node) {
+        int depth = 0;
+        TreeNode<NodeData> temp = node;
+        while (!temp.parent.getChildAt(0).data.name.equals("Ident")) {
+            temp = temp.parent;
+            depth++;
+        }
+        return depth;
+    }
+
+    private int arrayRegId(TreeNode<NodeData> node) {
+        TreeNode<NodeData> temp = node;
+        while (!temp.parent.getChildAt(0).data.name.equals("Ident")) {
+            temp = temp.parent;
+        }
+        temp = temp.parent.getChildAt(0);
+        return symTable.getItem(temp.data.value).regId;
+    }
+
+    private int fillEmptySize(TreeNode<NodeData> node, int cnt) {
+        int depth = initDepth(node);
+        int temp = 1;
+        for (int i = depth+1; i < this.arrayShape.size(); i++)
+            temp *= this.arrayShape.get(i);
+        try {
+            return (this.arrayShape.get(depth)-cnt) * temp;
+        } catch (Exception e) {
+            error();
+            return 0;
+        }
+    }
+
     private void visitConstInitArray(TreeNode<NodeData> node) {
         /*
          * TODO: 初始化
@@ -197,6 +269,25 @@ public class Generator {
          */
         if (analyzer.curBlockId == 0) {
             if (!analyzer.isConstInitVal(node)) error();
+            if (node.getChildAt(0).data.name.equals("ConstExpr")) {
+                if (initDepth(node) != this.arrayShape.size()) error();
+                visit(node.getChildAt(0));
+                node.data.value = "i32 " + node.getChildAt(0).data.intValue;
+            } else {
+                int cnt = 0;
+                for (TreeNode<NodeData> child : node.children) {
+                    if (child.data.name.equals("ConstInitVal")) {
+                        cnt++;
+                        visitConstInitArray(child);
+                        node.data.value += child.data.value + ",";
+                    }
+                }
+                int _fill_size = fillEmptySize(node, cnt);
+                if (_fill_size >= 0)
+                    node.data.value += "i32 0,".repeat(fillEmptySize(node, cnt));
+                else error();
+                node.data.value = StringUtils.chop(node.data.value);
+            }
         } else {
             if (!analyzer.hasCerVal(node)) error();
         }
@@ -253,20 +344,52 @@ public class Generator {
 
     private void visitVarArrayDef(TreeNode<NodeData> node) {
         Item declItem = analyzer.filVarArrayDef(node);
+        String declName = node.getChildAt(0).data.value;
 
         boolean hasInitVal = false;
+        int size = 1;
         for (TreeNode<NodeData> child : node.children) {
             if (child.data.name.equals("ConstExpr")) {
                 visit(child);
                 if (child.data.intValue < 0) error();
                 declItem.arraySize.add(child.data.intValue);
+                size *= child.data.intValue;
             }
             if (child.data.name.equals("InitVal"))
                 hasInitVal = true;
         }
-        // '=' InitVal
-        if (hasInitVal)
-            visit(node.getChildAt(node.children.size()-1));
+        this.arrayShape = declItem.arraySize;
+
+        TreeNode<NodeData> initVal = node.getChildAt(node.children.size()-1);
+
+        if (analyzer.curBlockId == 0) {
+            product += "@" + declName + " = dso_local global "
+                    + "[" + size + " x i32] ";
+            if (hasInitVal) {
+                visit(initVal);
+                product += "[" + initVal.data.value + "]\n";
+            } else {
+                product += "zeroinitializer\n";
+            }
+        } else {
+            // 局部数组初始化
+            declItem.regId = regId;
+            String decl = "%" + (regId++);
+            String init_reg = "%" + (regId++);
+            product += decl + " = alloca [" + size + " x i32]\n"
+                    + init_reg + " = getelementptr [" + size + " x i32], ["
+                    + size + " x i32]* " + decl + ", i32 0, i32 0\n"
+                    + "call void @memset(i32* " + init_reg + ", i32 0, i32 "
+                    + size * 4 + ")\n";
+
+            if (hasInitVal) {
+                visit(initVal);
+//                product += "store i32 "
+//                        + node.getChildAt(2).data.value + ", "
+//                        + declItem.vType + "* " + decl + "\n";
+//                declItem.intValue = node.getChildAt(2).data.intValue;
+            }
+        }
     }
 
     private void visitVarDef(TreeNode<NodeData> node) {
@@ -286,9 +409,86 @@ public class Generator {
         node.data.intValue = node.getChildAt(0).data.intValue;
     }
 
+    private int getInitValIndex(TreeNode<NodeData> node) {
+        int idx = 0;
+        for (TreeNode<NodeData> child : node.parent.children) {
+            if (child.data.name.equals("InitVal")) {
+                if (child == node)
+                    break;
+                idx++;
+            }
+        }
+        return idx;
+    }
+
+    private int getElePos(TreeNode<NodeData> node) {
+        ArrayList<Integer> idxs = new ArrayList<>();
+        TreeNode<NodeData> temp = node;
+        while (!temp.parent.getChildAt(0).data.name.equals("Ident")) {
+            idxs.add(getInitValIndex(temp));
+            temp = temp.parent;
+        }
+        int length = idxs.size();
+        int res = idxs.get(length-1);
+        for (int i = length-2; i >= 0; i--) {
+            res = res * this.arrayShape.get(length-i-1) + idxs.get(i);
+        }
+        return res;
+    }
+
+    private int getAllSize(ArrayList<Integer> arrayShape) {
+        int size = 1;
+        for (var v : arrayShape) {
+            size *= v;
+        }
+        return size;
+    }
+
     private void visitInitArrayVal(TreeNode<NodeData> node) {
-        for (TreeNode<NodeData> child : node.children)
-            visit(child);
+        if (analyzer.curBlockId == 0) {
+            if (node.getChildAt(0).data.name.equals("Expr")) {
+                if (initDepth(node) != this.arrayShape.size()) error();
+                visit(node.getChildAt(0));
+                node.data.value = "i32 " + node.getChildAt(0).data.intValue;
+            } else {
+                int cnt = 0;
+                for (TreeNode<NodeData> child : node.children) {
+                    if (child.data.name.equals("InitVal")) {
+                        cnt++;
+                        visitInitArrayVal(child);
+                        node.data.value += child.data.value + ",";
+                    }
+                }
+                int _fill_size = fillEmptySize(node, cnt);
+                if (_fill_size >= 0)
+                    node.data.value += "i32 0,".repeat(fillEmptySize(node, cnt));
+                else error();
+                node.data.value = StringUtils.chop(node.data.value);
+            }
+        } else {
+            if (node.getChildAt(0).data.name.equals("Expr")) {
+                if (initDepth(node) != this.arrayShape.size()) error();
+                visit(node.getChildAt(0));
+
+                String reg = "%" + (regId++);
+                int size = getAllSize(this.arrayShape);
+                product += reg + " = getelementptr [" + size
+                        + " x i32],[" + size + " x i32]* %" + arrayRegId(node)
+                        + ", i32 0, i32 " + getElePos(node) + "\n"
+                        + "store i32 " + node.getChildAt(0).data.value
+                        + ", i32* " + reg + "\n";
+            } else {
+                int cnt = 0;
+                for (TreeNode<NodeData> child : node.children) {
+                    if (child.data.name.equals("InitVal")) {
+                        cnt++;
+                        visitInitArrayVal(child);
+                    }
+                }
+                int _fill_size = fillEmptySize(node, cnt);
+                if (_fill_size < 0) error();
+            }
+        }
     }
 
     private void visitInitVal(TreeNode<NodeData> node) {
