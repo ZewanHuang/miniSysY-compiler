@@ -158,13 +158,6 @@ public class Generator {
         declItem.intValue = node.getChildAt(2).data.intValue;
     }
 
-    private boolean hasOnlyPart(TreeNode<NodeData> node) {
-        for (TreeNode<NodeData> leaf : node.getLeaves())
-            if (!leaf.data.value.equals("{") && !leaf.data.value.equals("}"))
-                return false;
-        return true;
-    }
-
     private ArrayList<Integer> arrayShape;
 
     private void visitConstArrayDef(TreeNode<NodeData> node) {
@@ -176,8 +169,7 @@ public class Generator {
         for (TreeNode<NodeData> child : node.children) {
             if (child.data.name.equals("ConstExpr")) {
                 visit(child);
-                if (!analyzer.isConstInitVal(child) || child.data.intValue < 0)
-                    error();
+                if (child.data.intValue < 0) error();
                 declItem.arraySize.add(child.data.intValue);
                 size *= child.data.intValue;
             }
@@ -302,6 +294,8 @@ public class Generator {
     }
 
     private void visitConstExp(TreeNode<NodeData> node) {
+        if (!analyzer.isConstInitVal(node))
+            error();
         visit(node.getChildAt(0));
         node.data.value = node.getChildAt(0).data.value;
         node.data.intValue = node.getChildAt(0).data.intValue;
@@ -352,9 +346,7 @@ public class Generator {
         for (TreeNode<NodeData> child : node.children) {
             if (child.data.name.equals("ConstExpr")) {
                 visit(child);
-                if (child.data.intValue < 0 ||
-                        (analyzer.curBlockId == 0 && !analyzer.isConstInitVal(child)))
-                    error();
+                if (child.data.intValue < 0) error();
                 declItem.arraySize.add(child.data.intValue);
                 size *= child.data.intValue;
             }
