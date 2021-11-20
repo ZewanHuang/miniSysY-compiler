@@ -919,7 +919,29 @@ public class Generator {
     }
 
     private void visitArrayRLval(TreeNode<NodeData> node) {
-
+        String ident = node.getChildAt(0).data.value;
+        Item arrayItem = symTable.getItem(ident);
+        ArrayList<Integer> _arraySize = arrayItem.arraySize;
+        visit(node.getChildAt(2));
+        String reg = node.getChildAt(2).data.value;
+        int shapeIdx = 1;
+        for (int i = 5; i < node.children.size(); i += 3) {
+            visit(node.getChildAt(i));
+            String _tempReg = "%" + (regId++);
+            product += _tempReg + " = mul i32 " + reg + ", " + _arraySize.get(shapeIdx) + "\n";
+            reg = "%" + (regId++);
+            product += reg + " = add i32 " + _tempReg + ", " + node.getChildAt(i).data.value + "\n";
+            shapeIdx++;
+        }
+        String _arrayPointer = "%" + (regId++);
+        int _allSize = getAllSize(_arraySize);
+        if (arrayItem.blockId == 0)
+            product += _arrayPointer + " = getelementptr [" + _allSize + " x i32], ["
+                    + _allSize + " x i32]* @" + arrayItem.name + ", i32 0, i32 " + reg + "\n";
+        else
+            product += _arrayPointer + " = getelementptr [" + _allSize + " x i32], ["
+                    + _allSize + " x i32]* %" + arrayItem.regId + ", i32 0, i32 " + reg + "\n";
+        node.data.value = _arrayPointer;
     }
 
     private void visitLval(TreeNode<NodeData> node) {
