@@ -98,7 +98,7 @@ public class Analyzer {
     public Item filVarArrayDef(TreeNode<NodeData> node) {
         TreeNode<NodeData> ident = node.getChildAt(0);
         if (!symTable.isDeclAvail(ident.data.value, curBlockId)) error();
-        return symTable.insert(ident.data.value, curBlockId, IdentType.CONST, ValueType.ARRAY);
+        return symTable.insert(ident.data.value, curBlockId, IdentType.VAL, ValueType.ARRAY);
     }
 
     /**

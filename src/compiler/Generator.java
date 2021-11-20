@@ -558,7 +558,7 @@ public class Generator {
      */
     private void visitAlignExpr(TreeNode<NodeData> node) {
         visit(node.getChildAt(0));
-        String val = node.getChildAt(0).data.value;
+        String val = node.getChildAt(0).getChildAt(0).data.value;
         Item valItem = symTable.getItem(val);
         visit(node.getChildAt(2));
         // 全局变量和局部变量的赋值不同，前者为 @，后者为 %
@@ -918,7 +918,7 @@ public class Generator {
         }
     }
 
-    private void visitArrayRLval(TreeNode<NodeData> node) {
+    private void visitArrayLval(TreeNode<NodeData> node, boolean isRight) {
         String ident = node.getChildAt(0).data.value;
         Item arrayItem = symTable.getItem(ident);
         ArrayList<Integer> _arraySize = arrayItem.arraySize;
@@ -942,6 +942,12 @@ public class Generator {
             product += _arrayPointer + " = getelementptr [" + _allSize + " x i32], ["
                     + _allSize + " x i32]* %" + arrayItem.regId + ", i32 0, i32 " + reg + "\n";
         node.data.value = _arrayPointer;
+
+        if (isRight) {
+            String _rReg = "%" + (regId++);
+            product += _rReg + " = load i32, i32* " + _arrayPointer + "\n";
+            node.data.value = _rReg;
+        }
     }
 
     private void visitLval(TreeNode<NodeData> node) {
@@ -958,8 +964,9 @@ public class Generator {
                 error();
             if (node.parent.data.name.equals("Stmt")) {
                 // Stmt -> Lval = Exp ; --- Lval -> Ident {'[' Exp ']'}
+                visitArrayLval(node, false);
             } else {
-                visitArrayRLval(node);
+                visitArrayLval(node, true);
             }
         }
     }
