@@ -285,8 +285,8 @@ public class Analyzer {
                         return false;
                     if (item.funcParams.get(i).vType == ValueType.ARRAY) {
                         // 若都是Array类型，还需判断维度是否对应相等
-                        int _arraySize_funcParam = item.funcParams.get(i).arraySize.size();
                         int _arraySize_call = param.data.dimension;
+                        int _arraySize_funcParam = item.funcParams.get(i).arraySize.size();
                         if (_arraySize_call != _arraySize_funcParam) {
                             return false;
                         }

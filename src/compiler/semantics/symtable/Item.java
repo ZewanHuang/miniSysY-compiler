@@ -55,6 +55,12 @@ public class Item {
 
     public Item(ValueType vType) {
         this.vType = vType;
+        this.arraySize = new ArrayList<>();
+    }
+
+    public Item(ValueType vType, int shape) {
+        this.vType = vType;
+        this.arraySize = new ArrayList<>(Arrays.asList(shape));
     }
 
     public static Item GETINT =
@@ -65,7 +71,7 @@ public class Item {
                     new ArrayList<>());
     public static Item GETARRAY =
             new Item("getarray",0, IdentType.FUNC, ValueType.INT,
-                    new ArrayList<>(Arrays.asList(new Item(ValueType.ARRAY))));
+                    new ArrayList<>(Arrays.asList(new Item(ValueType.ARRAY, 1))));
     public static Item PUTINT =
             new Item("putint",0, IdentType.FUNC, ValueType.VOID,
                     new ArrayList<>(Arrays.asList(new Item(ValueType.INT))));
@@ -74,7 +80,7 @@ public class Item {
                     new ArrayList<>(Arrays.asList(new Item(ValueType.INT))));
     public static Item PUTARRAY =
             new Item("putarray",0, IdentType.FUNC, ValueType.VOID,
-                    new ArrayList<>(Arrays.asList(new Item(ValueType.INT), new Item(ValueType.ARRAY))));
+                    new ArrayList<>(Arrays.asList(new Item(ValueType.INT, 0), new Item(ValueType.ARRAY, 1))));
 
     public String toString() {
         return String.format("%15s %10s %10s %12s %12d %10d %10s %20s %20s",
