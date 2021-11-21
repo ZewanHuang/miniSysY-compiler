@@ -184,7 +184,7 @@ public class Generator {
 
     private void visitFuncFParam(TreeNode<NodeData> node) {
         Item _item = analyzer.filFuncFParam(node);
-        funcNewItem.funcParams.add(_item.vType); // 记录函数参数列表
+        funcNewItem.funcParams.add(_item); // 记录函数参数列表
         if (_item.vType == Item.ValueType.ARRAY) {
             _item.arraySize.add(0);
             for (TreeNode<NodeData> child : node.children) {
@@ -380,6 +380,7 @@ public class Generator {
         visit(node.getChildAt(0));
         node.data.value = node.getChildAt(0).data.value;
         node.data.intValue = node.getChildAt(0).data.intValue;
+        node.data.dimension = node.getChildAt(0).data.dimension;
     }
 
     private void visitVarValDef(TreeNode<NodeData> node) {
@@ -607,7 +608,7 @@ public class Generator {
     }
 
     /**
-     * 处理 Stmt 节点的候选式 [Exp] ';'
+     * 处理 Stmt 节点的候选式 Exp ';'
      *
      * @param node Stmt节点
      */
@@ -615,6 +616,7 @@ public class Generator {
         visit(node.getChildAt(0));
         node.data.value = node.getChildAt(0).data.value;
         node.data.intValue = node.getChildAt(0).data.intValue;
+        node.data.dimension = node.getChildAt(0).data.dimension;
     }
 
     private void visitRetVoidStmt(TreeNode<NodeData> node) {
@@ -764,6 +766,7 @@ public class Generator {
             visit(child);
         node.data.value = node.getChildAt(0).data.value;
         node.data.intValue = node.getChildAt(0).data.intValue;
+        node.data.dimension = node.getChildAt(0).data.dimension;
     }
 
     private void visitOperaExpr(TreeNode<NodeData> node) {
@@ -805,6 +808,7 @@ public class Generator {
             }
             node.data.value = value_2;
         }
+        node.data.dimension = node.getChildAt(0).data.dimension;
     }
 
     private void visitCmpExpr(TreeNode<NodeData> node) {
@@ -828,6 +832,7 @@ public class Generator {
             value_1 = value_2;
         }
         node.data.value = value_2;
+        node.data.dimension = node.getChildAt(0).data.dimension;
     }
 
     private void visitLogicExpr(TreeNode<NodeData> node) {
@@ -844,6 +849,7 @@ public class Generator {
             value_1 = value_2;
         }
         node.data.value = value_2;
+        node.data.dimension = node.getChildAt(0).data.dimension;
     }
 
     /**
@@ -855,6 +861,7 @@ public class Generator {
         visit(node.getChildAt(0));
         node.data.value = node.getChildAt(0).data.value;
         node.data.intValue = node.getChildAt(0).data.intValue;
+        node.data.dimension = node.getChildAt(0).data.dimension;
     }
 
     /**
@@ -866,6 +873,7 @@ public class Generator {
         String funcName = node.getChildAt(0).data.value;
         Item funcItem = symTable.getItem(funcName);
         visit(node.getChildAt(2));
+        if (!analyzer.isFuncParamValid(node)) error();
         if (funcItem.vType == Item.ValueType.INT) {
             String reg = "%" + (regId++);
             node.data.value = reg;
@@ -876,6 +884,7 @@ public class Generator {
                 + "("
                 + node.getChildAt(2).data.value
                 + ")\n";
+        node.data.dimension = 0;
     }
 
     /**
@@ -895,6 +904,7 @@ public class Generator {
                 + " @" + funcName
                 + "("
                 + ")\n";
+        node.data.dimension = 0;
     }
 
     /**
@@ -933,6 +943,7 @@ public class Generator {
                 node.data.value = newValue;
             }
         }
+        node.data.dimension = 0;
     }
 
     private void visitUnaryExpr(TreeNode<NodeData> node) {
@@ -952,15 +963,18 @@ public class Generator {
             if (node.getChildAt(0).data.name.equals("Number")) {
                 node.data.value = node.getChildAt(0).data.value;
                 node.data.intValue = Integer.parseInt(node.data.value);
+                node.data.dimension = 0;
             } else if (node.getChildAt(0).data.name.equals("Lval")) {
                 visit(node.getChildAt(0));
                 node.data.value = node.getChildAt(0).data.value;
                 node.data.intValue = node.getChildAt(0).data.intValue;
+                node.data.dimension = node.getChildAt(0).data.dimension;
             }
         } else {
             visit(node.getChildAt(1));
             node.data.value = node.getChildAt(1).data.value;
             node.data.intValue = node.getChildAt(1).data.intValue;
+            node.data.dimension = node.getChildAt(1).data.dimension;
         }
     }
 
@@ -991,6 +1005,7 @@ public class Generator {
             else
                 product += "%" + valItem.regId + "\n";
         }
+        node.data.dimension = 0;
     }
 
     private void visitArrayLval(TreeNode<NodeData> node, boolean isRight) {
@@ -1002,10 +1017,11 @@ public class Generator {
         if (node.children.size() == 1) {
             // 一般出现在调用函数传参中
             reg = "0";
+            node.data.dimension = _arraySize.size();
         } else {
             visit(node.getChildAt(2));
             reg = node.getChildAt(2).data.value;
-            int exprIdx = 5;
+            int exprIdx = 5, _dimension = 0;
             for (int shapeIdx = 1; shapeIdx < _arraySize.size(); shapeIdx++) {
                 if (exprIdx < node.children.size()) {
                     visit(node.getChildAt(exprIdx));
@@ -1014,6 +1030,7 @@ public class Generator {
                     reg = "%" + (regId++);
                     product += reg + " = add i32 " + _tempReg + ", " + node.getChildAt(exprIdx).data.value + "\n";
                 } else {
+                    _dimension += 1;
                     String _tempReg = "%" + (regId++);
                     product += _tempReg + " = mul i32 " + reg + ", " + _arraySize.get(shapeIdx) + "\n";
                     reg = "%" + (regId++);
@@ -1021,6 +1038,7 @@ public class Generator {
                 }
                 exprIdx += 3;
             }
+            node.data.dimension = _dimension;
         }
 
         String _arrayPointer;

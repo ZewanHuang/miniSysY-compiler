@@ -65,26 +65,13 @@ public class Analyzer {
     }
 
     /**
-     * 判断函数调用传参的类型
+     * TODO: 判断函数调用传参的类型
      *
      * @param node Expr节点
      * @return ARRAY或INT
      */
     public ValueType funcRParamType(TreeNode<NodeData> node) {
-        boolean _hasArray = false, _hasIntFunc = false;
-        int _lpCnt = 0, _arraySize = 0;
-        for (TreeNode<NodeData> leaf : node.getLeaves()) {
-            if (leaf.data.name.equals("Ident")) {
-                Item _item = symTable.getItem(leaf.data.value);
-                if (_item.vType == ValueType.ARRAY) {
-                    _hasArray = true;
-                    _arraySize = _item.arraySize.size();
-                }
-                else if (_item.iType == IdentType.FUNC && _item.vType == ValueType.INT) _hasIntFunc = true;
-            }
-            if (leaf.data.value.equals("[")) _lpCnt++;
-        }
-        if (_hasArray && !_hasIntFunc && _lpCnt != _arraySize) return ValueType.ARRAY;
+        if (node.data.dimension > 0) return ValueType.ARRAY;
         return ValueType.INT;
     }
 
@@ -276,15 +263,34 @@ public class Analyzer {
             return false;
         // 判断函数参数个数是否正确
         int paramsCnt = node.children.size() == 3? 0 : node.getChildAt(2).children.size()/2+1;
-        if (item.funcParams.size() != paramsCnt)
+        return item.funcParams.size() == paramsCnt;
+    }
+
+    public boolean isFuncParamValid(TreeNode<NodeData> node) {
+        String ident = node.getChildAt(0).data.value;
+        // 判断函数是否定义
+        Item item = symTable.getItem(ident);
+        if (item == null || item.iType != IdentType.FUNC)
             return false;
-        // 判断函数参数是否正确
+        // 判断函数参数个数是否正确
+        int paramsCnt = node.children.size() == 3? 0 : node.getChildAt(2).children.size()/2+1;
+        if (paramsCnt != item.funcParams.size())
+            return false;
+        // 判断函数参数是否正确：int、array、array几维
         if (paramsCnt > 0) {
             int i = 0;
             for (TreeNode<NodeData> param : node.getChildAt(2).children) {
                 if (param.data.name.equals("Expr")) {
-                    if (item.funcParams.get(i) != funcRParamType(param))
+                    if (item.funcParams.get(i).vType != funcRParamType(param))
                         return false;
+                    if (item.funcParams.get(i).vType == ValueType.ARRAY) {
+                        // 若都是Array类型，还需判断维度是否对应相等
+                        int _arraySize_funcParam = item.funcParams.get(i).arraySize.size();
+                        int _arraySize_call = param.data.dimension;
+                        if (_arraySize_call != _arraySize_funcParam) {
+                            return false;
+                        }
+                    }
                     i++;
                 }
             }

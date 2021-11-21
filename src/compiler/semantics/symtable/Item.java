@@ -34,22 +34,12 @@ public class Item {
     public int blockId;                     /* 所在区块序号 */
     public IdentType iType;                 /* 标识符类型 */
     public ValueType vType;                 /* 标识符值类型 */
-    public ArrayList<ValueType> funcParams;    /* 函数参数列表 */
+    public ArrayList<Item> funcParams;      /* 函数参数列表 */
     public int regId;                       /* 寄存器ID */
     public Integer intValue;                /* 编译时可求值 */
     public ArrayList<Integer> arraySize;    /* 数组长度 */
 
-    public Item(String name, int blockId , IdentType iType, ValueType vType) {
-        this.name = name;
-        this.blockId = blockId;
-        this.iType = iType;
-        this.vType = vType;
-        this.isValid = true;
-        this.funcParams = new ArrayList<>();
-        this.arraySize = new ArrayList<>();
-    }
-
-    public Item(String name, int blockId , IdentType iType, ValueType vType, ArrayList<ValueType> funcParams) {
+    public Item(String name, int blockId, IdentType iType, ValueType vType, ArrayList<Item> funcParams) {
         this.name = name;
         this.blockId = blockId;
         this.iType = iType;
@@ -57,6 +47,14 @@ public class Item {
         this.isValid = true;
         this.funcParams = funcParams;
         this.arraySize = new ArrayList<>();
+    }
+
+    public Item(String name, int blockId , IdentType iType, ValueType vType) {
+        this(name, blockId, iType, vType, new ArrayList<>());
+    }
+
+    public Item(ValueType vType) {
+        this.vType = vType;
     }
 
     public static Item GETINT =
@@ -67,16 +65,16 @@ public class Item {
                     new ArrayList<>());
     public static Item GETARRAY =
             new Item("getarray",0, IdentType.FUNC, ValueType.INT,
-                    new ArrayList<>(Arrays.asList(ValueType.ARRAY)));
+                    new ArrayList<>(Arrays.asList(new Item(ValueType.ARRAY))));
     public static Item PUTINT =
             new Item("putint",0, IdentType.FUNC, ValueType.VOID,
-                    new ArrayList<>(Arrays.asList(ValueType.INT)));
+                    new ArrayList<>(Arrays.asList(new Item(ValueType.INT))));
     public static Item PUTCH =
             new Item("putch",0, IdentType.FUNC, ValueType.VOID,
-                    new ArrayList<>(Arrays.asList(ValueType.INT)));
+                    new ArrayList<>(Arrays.asList(new Item(ValueType.INT))));
     public static Item PUTARRAY =
             new Item("putarray",0, IdentType.FUNC, ValueType.VOID,
-                    new ArrayList<>(Arrays.asList(ValueType.INT, ValueType.ARRAY)));
+                    new ArrayList<>(Arrays.asList(new Item(ValueType.INT), new Item(ValueType.ARRAY))));
 
     public String toString() {
         return String.format("%15s %10s %10s %12s %12d %10d %10s %20s %20s",
