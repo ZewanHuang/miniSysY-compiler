@@ -72,13 +72,19 @@ public class Analyzer {
      */
     public ValueType funcRParamType(TreeNode<NodeData> node) {
         boolean _hasArray = false, _hasIntFunc = false;
-        for (TreeNode<NodeData> leaf : node.getLeaves())
+        int _lpCnt = 0, _arraySize = 0;
+        for (TreeNode<NodeData> leaf : node.getLeaves()) {
             if (leaf.data.name.equals("Ident")) {
                 Item _item = symTable.getItem(leaf.data.value);
-                if (_item.vType == ValueType.ARRAY) _hasArray = true;
+                if (_item.vType == ValueType.ARRAY) {
+                    _hasArray = true;
+                    _arraySize = _item.arraySize.size();
+                }
                 else if (_item.iType == IdentType.FUNC && _item.vType == ValueType.INT) _hasIntFunc = true;
             }
-        if (_hasArray && !_hasIntFunc) return ValueType.ARRAY;
+            if (leaf.data.value.equals("[")) _lpCnt++;
+        }
+        if (_hasArray && !_hasIntFunc && _lpCnt != _arraySize) return ValueType.ARRAY;
         return ValueType.INT;
     }
 
