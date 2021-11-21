@@ -51,7 +51,7 @@ public class Analyzer {
      *
      * @param node FuncDef节点
      */
-    public void filFuncDef(TreeNode<NodeData> node) {
+    public Item filFuncDef(TreeNode<NodeData> node) {
         TreeNode<NodeData> ident;
         ident = node.getChildAt(1);
         if (!symTable.isDeclAvail(ident.data.value, curBlockId)) // 若同区块内该变量名被用，则报错
@@ -61,7 +61,7 @@ public class Analyzer {
             vtype = Item.ValueType.INT;
         else
             vtype = Item.ValueType.VOID;
-        symTable.insert(ident.data.value, curBlockId, IdentType.FUNC, vtype);
+        return symTable.insert(ident.data.value, curBlockId, IdentType.FUNC, vtype);
     }
 
     /**
@@ -71,11 +71,14 @@ public class Analyzer {
      * @return ARRAY或INT
      */
     public ValueType funcRParamType(TreeNode<NodeData> node) {
+        boolean _hasArray = false, _hasIntFunc = false;
         for (TreeNode<NodeData> leaf : node.getLeaves())
             if (leaf.data.name.equals("Ident")) {
-                if (symTable.getItem(leaf.data.value).vType == ValueType.ARRAY)
-                    return ValueType.ARRAY;
+                Item _item = symTable.getItem(leaf.data.value);
+                if (_item.vType == ValueType.ARRAY) _hasArray = true;
+                else if (_item.iType == IdentType.FUNC && _item.vType == ValueType.INT) _hasIntFunc = true;
             }
+        if (_hasArray && !_hasIntFunc) return ValueType.ARRAY;
         return ValueType.INT;
     }
 
@@ -252,8 +255,17 @@ public class Analyzer {
         int paramsCnt = node.children.size() == 3? 0 : node.getChildAt(2).children.size()/2+1;
         if (item.funcParams.size() != paramsCnt)
             return false;
-        // TODO:判断函数参数是否正确
-
+        // 判断函数参数是否正确
+        if (paramsCnt > 0) {
+            int i = 0;
+            for (TreeNode<NodeData> param : node.getChildAt(2).children) {
+                if (param.data.name.equals("Expr")) {
+                    if (item.funcParams.get(i) != funcRParamType(param))
+                        return false;
+                    i++;
+                }
+            }
+        }
         return true;
     }
 }
