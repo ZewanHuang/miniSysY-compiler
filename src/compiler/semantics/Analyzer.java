@@ -65,6 +65,34 @@ public class Analyzer {
     }
 
     /**
+     * 判断函数调用传参的类型
+     *
+     * @param node Expr节点
+     * @return ARRAY或INT
+     */
+    public ValueType funcRParamType(TreeNode<NodeData> node) {
+        for (TreeNode<NodeData> leaf : node.getLeaves())
+            if (leaf.data.name.equals("Ident")) {
+                if (symTable.getItem(leaf.data.value).vType == ValueType.ARRAY)
+                    return ValueType.ARRAY;
+            }
+        return ValueType.INT;
+    }
+
+    /**
+     * 登记函数参数到符号表
+     *
+     * @param node FuncFParam节点
+     */
+    public Item filFuncFParam(TreeNode<NodeData> node) {
+        TreeNode<NodeData> _ident = node.getChildAt(1);
+        if (node.children.size() == 2)
+            return symTable.insert(_ident.data.value, curBlockId+1, IdentType.PARAM, ValueType.INT);
+        else
+            return symTable.insert(_ident.data.value, curBlockId+1, IdentType.PARAM, ValueType.ARRAY);
+    }
+
+    /**
      * 登记常量int变量到符号表
      *
      * @param node ConstDef节点
@@ -158,9 +186,26 @@ public class Analyzer {
         String ident = node.getChildAt(0).data.value;
         Item item = symTable.getItem(ident);
         if (node.parent.data.name.equals("Stmt"))
-            return item != null && item.iType == IdentType.VAL;
+            return item != null && (item.iType == IdentType.VAL || item.iType == IdentType.PARAM);
         else
-            return item != null && (item.iType == IdentType.VAL || item.iType == IdentType.CONST);
+            return item != null &&
+                    (item.iType == IdentType.VAL || item.iType == IdentType.CONST || item.iType == IdentType.PARAM);
+    }
+
+    /**
+     * 判断某节点是否为函数右参数延申节点
+     *
+     * @param node Lval节点
+     * @return 是或否
+     */
+    public boolean belFuncRParams(TreeNode<NodeData> node) {
+        TreeNode<NodeData> _temp = node;
+        while (!_temp.data.name.equals("CompUnit")) {
+            if (_temp.data.name.equals("FuncRParams"))
+                return true;
+            _temp = _temp.parent;
+        }
+        return false;
     }
 
     /**
@@ -174,11 +219,11 @@ public class Analyzer {
         String ident = node.getChildAt(0).data.value;
         Item item = symTable.getItem(ident);
         if (node.parent.data.name.equals("Stmt"))
-            isValid = (item != null && item.iType == IdentType.VAL
+            isValid = (item != null && (item.iType == IdentType.VAL || item.iType == IdentType.PARAM)
                     && item.vType == ValueType.ARRAY);
         else
             isValid = (item != null &&
-                    (item.iType == IdentType.VAL || item.iType == IdentType.CONST)
+                    (item.iType == IdentType.VAL || item.iType == IdentType.CONST || item.iType == IdentType.PARAM)
                     && item.vType == ValueType.ARRAY);
 
         int cnt_exp = 0;
@@ -187,7 +232,7 @@ public class Analyzer {
                 cnt_exp++;
         String identName = node.getChildAt(0).data.value;
         Item arrayItem = symTable.getItem(identName);
-        if (arrayItem.arraySize.size() != cnt_exp) isValid = false;
+        if (!belFuncRParams(node) && arrayItem.arraySize.size() != cnt_exp) isValid = false;
         return isValid;
     }
 

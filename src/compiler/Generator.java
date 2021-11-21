@@ -88,7 +88,10 @@ public class Generator {
     private void visit(TreeNode<NodeData> node) {
         analyzer.handleBlock(node);
         switch (node.data.name) {
+            case "CompUnit" -> visitCompUnit(node);
             case "FuncDef" -> visitFuncDef(node);
+            case "FuncFParams" -> visitFuncFParams(node);
+            case "FuncFParam" -> visitFuncFParam(node);
             case "Block" -> visitBlock(node);
             case "ConstDef" -> visitConstDef(node);
             case "ConstInitVal" -> visitConstInitVal(node);
@@ -112,6 +115,19 @@ public class Generator {
         }
     }
 
+    private void visitCompUnit(TreeNode<NodeData> node) {
+        // 程序中必须存在且仅存在一个标识为 main 的 FuncDef
+        int _mainCount = 0;
+        for (TreeNode<NodeData> child : node.children) {
+            if (child.data.name.equals("FuncDef") && child.getChildAt(1).data.value.equals("main"))
+                _mainCount += 1;
+        }
+        if (_mainCount != 1) error();
+
+        for (TreeNode<NodeData> child : node.children)
+            visit(child);
+    }
+
     /**
      * 当前节点为 FuncDef 节点时，添加函数定义语句
      *
@@ -120,19 +136,78 @@ public class Generator {
     private void visitFuncDef(TreeNode<NodeData> node) {
         analyzer.filFuncDef(node);
         String funcName = node.getChildAt(1).data.value;
+
+        // 程序中必须存在且仅存在一个标识为 main、无参数、返回类型为 int 的 FuncDef
+        if (funcName.equals("main")) {
+            if (node.children.size() != 5 || !node.getChildAt(0).getChildAt(0).data.value.equals("int"))
+                error();
+
+            // main函数寄存器ID从1开始
+            regId = 1;
+        } else {
+            // 其它函数寄存器ID从0开始
+            regId = 0;
+        }
+
         Item funcItem = symTable.getItem(funcName);
-        product += "define dso_local " + funcItem.vType + " @" + funcName + "() {\n";
         if (node.children.size() == 5) {
+            product += "define dso_local " + funcItem.vType + " @" + funcName + "() {\n";
             visit(node.getChildAt(4));
         } else {
+            product += "define dso_local " + funcItem.vType + " @" + funcName + "(";
+            visit(node.getChildAt(3));
+            regId++;
+            product += node.getChildAt(3).data.value + ") {\n";
+            // 对形参进行初始化
+            for (Item item : symTable.getParams(analyzer.curBlockId+1)) {
+                int _oldRegId = item.regId;
+                item.regId = regId;
+                product += "%" + (regId++) + " = alloca " + item.vType + "\n";
+                product += "store " + item.vType + " %" + _oldRegId + ", " + item.vType + "* %" + item.regId + "\n";
+            }
             visit(node.getChildAt(5));
         }
         product += "}\n\n";
     }
 
+    private void visitFuncFParams(TreeNode<NodeData> node) {
+        StringBuilder _value = new StringBuilder();
+        for (TreeNode<NodeData> child : node.children) {
+            if (child.data.name.equals("FuncFParam")) {
+                visit(child);
+                _value.append(child.data.value).append(",");
+            }
+        }
+        node.data.value = StringUtils.chop(_value.toString());
+    }
+
+    private void visitFuncFParam(TreeNode<NodeData> node) {
+        Item _item = analyzer.filFuncFParam(node);
+        if (_item.vType == Item.ValueType.ARRAY) {
+            _item.arraySize.add(0);
+            for (TreeNode<NodeData> child : node.children) {
+                if (child.data.name.equals("Expr")) {
+                    // 函数形参数组的尺寸要求可求值的常量表达式
+                    if (!analyzer.isConstInitVal(child)) error();
+                    visit(child);
+                    _item.arraySize.add(child.data.intValue);
+                }
+            }
+        }
+        _item.regId = regId;
+        node.data.value = _item.vType + " %" + (regId++);
+    }
+
     private void visitBlock(TreeNode<NodeData> node) {
-        for (TreeNode<NodeData> child : node.children)
-            visit(child);
+        for (TreeNode<NodeData> child : node.children) {
+            switch (child.data.value) {
+                case "{", "}" -> analyzer.handleBlock(child);
+                // A new block
+                default -> {
+                    visit(child);
+                }
+            }
+        }
     }
 
     private void visitConstValDef(TreeNode<NodeData> node) {
@@ -149,13 +224,13 @@ public class Generator {
             product += decl + " = alloca " + declItem.vType + "\n";
             visit(node.getChildAt(2));
             if (declItem.blockId == 0) {
-                product += "store " + declItem.vType + " "
+                product += "store " + "i32 "
                         + node.getChildAt(2).data.value + ", "
-                        + declItem.vType + "* @" + declName + "\n";
+                        + "i32* @" + declName + "\n";
             } else {
-                product += "store " + declItem.vType + " "
+                product += "store " + "i32 "
                         + node.getChildAt(2).data.value + ", "
-                        + declItem.vType + "* " + decl + "\n";
+                        + "i32* " + decl + "\n";
             }
         }
         node.data.intValue = node.getChildAt(2).data.intValue;
@@ -327,13 +402,13 @@ public class Generator {
             if (node.children.size() >= 3) {
                 visit(node.getChildAt(2));
                 if (declItem.blockId == 0) {
-                    product += "store " + declItem.vType + " "
+                    product += "store i32 "
                             + node.getChildAt(2).data.value + ", "
-                            + declItem.vType + "* @" + declName + "\n";
+                            + "i32* @" + declName + "\n";
                 } else {
-                    product += "store " + declItem.vType + " "
+                    product += "store i32 "
                             + node.getChildAt(2).data.value + ", "
-                            + declItem.vType + "* " + decl + "\n";
+                            + "i32* " + decl + "\n";
                 }
                 declItem.intValue = node.getChildAt(2).data.intValue;
             }
@@ -540,6 +615,10 @@ public class Generator {
         node.data.intValue = node.getChildAt(0).data.intValue;
     }
 
+    private void visitRetVoidStmt(TreeNode<NodeData> node) {
+        product += "ret void\n";
+    }
+
     /**
      * 处理 Stmt 节点的候选式 'return' Exp ';'
      *
@@ -561,9 +640,9 @@ public class Generator {
         Item valItem = symTable.getItem(val);
         visit(node.getChildAt(2));
         // 全局变量和局部变量的赋值不同，前者为 @，后者为 %
-        product += "store " + valItem.vType + " "
+        product += "store i32 "
                 + node.getChildAt(2).data.value + ", "
-                + valItem.vType + "* " + node.getChildAt(0).data.value + "\n";
+                + "i32* " + node.getChildAt(0).data.value + "\n";
     }
 
     /**
@@ -654,6 +733,7 @@ public class Generator {
                     case "Break" -> visitBreakStmt(node);
                     case "Continue" -> visitContinueStmt(node);
                     case "Expr" -> visitExprStmt(node);
+                    case "Return" -> visitRetVoidStmt(node);
                 }
             }
             case 3 -> {
@@ -783,12 +863,12 @@ public class Generator {
     private void visitFuncUE(TreeNode<NodeData> node) {
         String funcName = node.getChildAt(0).data.value;
         Item funcItem = symTable.getItem(funcName);
+        visit(node.getChildAt(2));
         if (funcItem.vType == Item.ValueType.INT) {
             String reg = "%" + (regId++);
             node.data.value = reg;
             product += reg + " = ";
         }
-        visit(node.getChildAt(2));
         product += "call " + funcItem.vType
                 + " @" + funcName
                 + "("
@@ -888,7 +968,7 @@ public class Generator {
         for (int i = 0; i < childCnt; i += 2) {
             if (i >= 1) value += ",";
             visit(node.getChildAt(i));
-            value += "i32 " + node.getChildAt(i).data.value;
+            value += analyzer.funcRParamType(node.getChildAt(i)) + " " + node.getChildAt(i).data.value;
         }
         node.data.value = value;
     }
@@ -926,17 +1006,27 @@ public class Generator {
             product += reg + " = add i32 " + _tempReg + ", " + node.getChildAt(i).data.value + "\n";
             shapeIdx++;
         }
-        String _arrayPointer = "%" + (regId++);
+        String _arrayPointer;
         int _allSize = getAllSize(_arraySize);
-        if (arrayItem.blockId == 0)
+        if (arrayItem.blockId == 0) {
+            _arrayPointer = "%" + (regId++);
             product += _arrayPointer + " = getelementptr [" + _allSize + " x i32], ["
                     + _allSize + " x i32]* @" + arrayItem.name + ", i32 0, i32 " + reg + "\n";
-        else
-            product += _arrayPointer + " = getelementptr [" + _allSize + " x i32], ["
-                    + _allSize + " x i32]* %" + arrayItem.regId + ", i32 0, i32 " + reg + "\n";
+        } else {
+            if (arrayItem.iType == Item.IdentType.PARAM) {
+                String _regArray = "%" + (regId++);
+                product += _regArray + " = load i32*, i32** %" + arrayItem.regId + "\n";
+                _arrayPointer = "%" + (regId++);
+                product += _arrayPointer + " = getelementptr i32, i32* " + _regArray + ", i32 " + reg + "\n";
+            } else {
+                _arrayPointer = "%" + (regId++);
+                product += _arrayPointer + " = getelementptr [" + _allSize + " x i32], ["
+                        + _allSize + " x i32]* %" + arrayItem.regId + ", i32 0, i32 " + reg + "\n";
+            }
+        }
         node.data.value = _arrayPointer;
 
-        if (isRight) {
+        if (isRight && !analyzer.belFuncRParams(node)) {
             String _rReg = "%" + (regId++);
             product += _rReg + " = load i32, i32* " + _arrayPointer + "\n";
             node.data.value = _rReg;
