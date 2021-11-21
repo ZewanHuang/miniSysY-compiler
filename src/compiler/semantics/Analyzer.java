@@ -246,6 +246,23 @@ public class Analyzer {
     }
 
     /**
+     * 判断Lval节点作为数组被调用时，该变量为Int还是Array
+     *
+     * @param node Lval节点
+     * @return Int或Array
+     */
+    public ValueType arrayLvalType(TreeNode<NodeData> node) {
+        int _expCnt = 0;
+        for (TreeNode<NodeData> child : node.children) {
+            if (child.data.name.equals("Expr"))
+                _expCnt += 1;
+        }
+        Item _arrayItem = symTable.getItem(node.getChildAt(0).data.value);
+        if (_arrayItem.arraySize.size() == _expCnt) return ValueType.INT;
+        else return ValueType.ARRAY;
+    }
+
+    /**
      * 判断函数调用是否合法，即函数是否定义，以及参数是否正确
      *
      * @param node UnaryExp节点

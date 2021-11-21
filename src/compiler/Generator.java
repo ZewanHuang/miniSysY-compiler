@@ -140,22 +140,19 @@ public class Generator {
         String funcName = node.getChildAt(1).data.value;
 
         // 程序中必须存在且仅存在一个标识为 main、无参数、返回类型为 int 的 FuncDef
-        if (funcName.equals("main")) {
+        if (funcName.equals("main"))
             if (node.children.size() != 5 || !node.getChildAt(0).getChildAt(0).data.value.equals("int"))
                 error();
 
-            // main函数寄存器ID从1开始
-            regId = 1;
-        } else {
-            // 其它函数寄存器ID从0开始
-            regId = 0;
-        }
-
         Item funcItem = symTable.getItem(funcName);
         if (node.children.size() == 5) {
+            // 无参数的函数寄存器ID从1开始
+            regId = 1;
             product += "define dso_local " + funcItem.vType + " @" + funcName + "() {\n";
             visit(node.getChildAt(4));
         } else {
+            // 有参数的函数寄存器ID从0开始
+            regId = 0;
             product += "define dso_local " + funcItem.vType + " @" + funcName + "(";
             visit(node.getChildAt(3));
             regId++;
@@ -1046,7 +1043,9 @@ public class Generator {
         }
         node.data.value = _arrayPointer;
 
-        if (isRight && !analyzer.belFuncRParams(node)) {
+        // Lval在右侧且不为函数传参，或者，若其为函数传参但作为Int被调用时，加load
+        if ((isRight && !analyzer.belFuncRParams(node)) ||
+                (analyzer.belFuncRParams(node) && analyzer.arrayLvalType(node) == Item.ValueType.INT)) {
             String _rReg = "%" + (regId++);
             product += _rReg + " = load i32, i32* " + _arrayPointer + "\n";
             node.data.value = _rReg;
