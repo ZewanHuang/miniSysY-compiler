@@ -29,8 +29,8 @@ public class SymTable {
      */
     public String toString() {
         StringBuilder table = new StringBuilder();
-        table.append(String.format("%15s %10s %10s %12s %12s %10s %10s %20s\n",
-                "name", "iType", "vType", "hasCerVal", "intValue", "blockId", "isValid", "arrayShape"));
+        table.append(String.format("%15s %10s %10s %12s %12s %10s %10s %20s %20s\n",
+                "name", "iType", "vType", "hasCerVal", "intValue", "blockId", "isValid", "arrayShape", "funcParams"));
         for (Item item : symTable)
             table.append(item.toString()).append("\n");
         return table.toString();
@@ -76,6 +76,15 @@ public class SymTable {
             }
         }
         return item;
+    }
+
+    public ArrayList<Item> getParams(int blockId) {
+        ArrayList<Item> _items = new ArrayList<>();
+        for (Item item : symTable) {
+            if (item.iType == Item.IdentType.PARAM && item.blockId == blockId && item.isValid)
+                _items.add(item);
+        }
+        return _items;
     }
 
     public boolean isDeclAvail(String name, int curBlockId) {

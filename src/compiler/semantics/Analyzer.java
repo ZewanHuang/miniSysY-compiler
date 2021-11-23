@@ -51,7 +51,7 @@ public class Analyzer {
      *
      * @param node FuncDef节点
      */
-    public void filFuncDef(TreeNode<NodeData> node) {
+    public Item filFuncDef(TreeNode<NodeData> node) {
         TreeNode<NodeData> ident;
         ident = node.getChildAt(1);
         if (!symTable.isDeclAvail(ident.data.value, curBlockId)) // 若同区块内该变量名被用，则报错
@@ -61,7 +61,31 @@ public class Analyzer {
             vtype = Item.ValueType.INT;
         else
             vtype = Item.ValueType.VOID;
-        symTable.insert(ident.data.value, curBlockId, IdentType.FUNC, vtype);
+        return symTable.insert(ident.data.value, curBlockId, IdentType.FUNC, vtype);
+    }
+
+    /**
+     * TODO: 判断函数调用传参的类型
+     *
+     * @param node Expr节点
+     * @return ARRAY或INT
+     */
+    public ValueType funcRParamType(TreeNode<NodeData> node) {
+        if (node.data.dimension > 0) return ValueType.ARRAY;
+        return ValueType.INT;
+    }
+
+    /**
+     * 登记函数参数到符号表
+     *
+     * @param node FuncFParam节点
+     */
+    public Item filFuncFParam(TreeNode<NodeData> node) {
+        TreeNode<NodeData> _ident = node.getChildAt(1);
+        if (node.children.size() == 2)
+            return symTable.insert(_ident.data.value, curBlockId+1, IdentType.PARAM, ValueType.INT);
+        else
+            return symTable.insert(_ident.data.value, curBlockId+1, IdentType.PARAM, ValueType.ARRAY);
     }
 
     /**
@@ -158,9 +182,26 @@ public class Analyzer {
         String ident = node.getChildAt(0).data.value;
         Item item = symTable.getItem(ident);
         if (node.parent.data.name.equals("Stmt"))
-            return item != null && item.iType == IdentType.VAL;
+            return item != null && (item.iType == IdentType.VAL || item.iType == IdentType.PARAM);
         else
-            return item != null && (item.iType == IdentType.VAL || item.iType == IdentType.CONST);
+            return item != null &&
+                    (item.iType == IdentType.VAL || item.iType == IdentType.CONST || item.iType == IdentType.PARAM);
+    }
+
+    /**
+     * 判断某节点是否为函数右参数延申节点
+     *
+     * @param node Lval节点
+     * @return 是或否
+     */
+    public boolean belFuncRParams(TreeNode<NodeData> node) {
+        TreeNode<NodeData> _temp = node;
+        while (!_temp.data.name.equals("CompUnit")) {
+            if (_temp.data.name.equals("FuncRParams"))
+                return true;
+            _temp = _temp.parent;
+        }
+        return false;
     }
 
     /**
@@ -174,11 +215,11 @@ public class Analyzer {
         String ident = node.getChildAt(0).data.value;
         Item item = symTable.getItem(ident);
         if (node.parent.data.name.equals("Stmt"))
-            isValid = (item != null && item.iType == IdentType.VAL
+            isValid = (item != null && (item.iType == IdentType.VAL || item.iType == IdentType.PARAM)
                     && item.vType == ValueType.ARRAY);
         else
             isValid = (item != null &&
-                    (item.iType == IdentType.VAL || item.iType == IdentType.CONST)
+                    (item.iType == IdentType.VAL || item.iType == IdentType.CONST || item.iType == IdentType.PARAM)
                     && item.vType == ValueType.ARRAY);
 
         int cnt_exp = 0;
@@ -187,8 +228,25 @@ public class Analyzer {
                 cnt_exp++;
         String identName = node.getChildAt(0).data.value;
         Item arrayItem = symTable.getItem(identName);
-        if (arrayItem.arraySize.size() != cnt_exp) isValid = false;
+        if (!belFuncRParams(node) && arrayItem.arraySize.size() != cnt_exp) isValid = false;
         return isValid;
+    }
+
+    /**
+     * 判断Lval节点作为数组被调用时，该变量为Int还是Array
+     *
+     * @param node Lval节点
+     * @return Int或Array
+     */
+    public ValueType arrayLvalType(TreeNode<NodeData> node) {
+        int _expCnt = 0;
+        for (TreeNode<NodeData> child : node.children) {
+            if (child.data.name.equals("Expr"))
+                _expCnt += 1;
+        }
+        Item _arrayItem = symTable.getItem(node.getChildAt(0).data.value);
+        if (_arrayItem.arraySize.size() == _expCnt) return ValueType.INT;
+        else return ValueType.ARRAY;
     }
 
     /**
@@ -205,10 +263,38 @@ public class Analyzer {
             return false;
         // 判断函数参数个数是否正确
         int paramsCnt = node.children.size() == 3? 0 : node.getChildAt(2).children.size()/2+1;
-        if (item.funcParams.size() != paramsCnt)
-            return false;
-        // TODO:判断函数参数是否正确
+        return item.funcParams.size() == paramsCnt;
+    }
 
+    public boolean isFuncParamValid(TreeNode<NodeData> node) {
+        String ident = node.getChildAt(0).data.value;
+        // 判断函数是否定义
+        Item item = symTable.getItem(ident);
+        if (item == null || item.iType != IdentType.FUNC)
+            return false;
+        // 判断函数参数个数是否正确
+        int paramsCnt = node.children.size() == 3? 0 : node.getChildAt(2).children.size()/2+1;
+        if (paramsCnt != item.funcParams.size())
+            return false;
+        // 判断函数参数是否正确：int、array、array几维
+        if (paramsCnt > 0) {
+            int i = 0;
+            for (TreeNode<NodeData> param : node.getChildAt(2).children) {
+                if (param.data.name.equals("Expr")) {
+                    if (item.funcParams.get(i).vType != funcRParamType(param))
+                        return false;
+                    if (item.funcParams.get(i).vType == ValueType.ARRAY) {
+                        // 若都是Array类型，还需判断维度是否对应相等
+                        int _arraySize_call = param.data.dimension;
+                        int _arraySize_funcParam = item.funcParams.get(i).arraySize.size();
+                        if (_arraySize_call != _arraySize_funcParam) {
+                            return false;
+                        }
+                    }
+                    i++;
+                }
+            }
+        }
         return true;
     }
 }

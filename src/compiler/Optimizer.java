@@ -10,6 +10,7 @@ public class Optimizer {
 
     public String optim() {
         optimBr();
+        optimBlock();
         return product;
     }
 
@@ -30,6 +31,18 @@ public class Optimizer {
             }
             result += "\n";
         }
+        product = result;
+    }
+
+    private void optimBlock() {
+        String result = "";
+        String[] lines = product.split("\n");
+        for (int i = 0; i < lines.length-1; i++) {
+            if (lines[i].endsWith(":") && lines[i+1].equals("}"))
+                continue;
+            result += lines[i] + "\n";
+        }
+        result += lines[lines.length-1];
         product = result;
     }
     

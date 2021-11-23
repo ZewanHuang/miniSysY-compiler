@@ -92,7 +92,10 @@ public class Generator {
     private void visit(TreeNode<NodeData> node) {
         analyzer.handleBlock(node);
         switch (node.data.name) {
+            case "CompUnit" -> visitCompUnit(node);
             case "FuncDef" -> visitFuncDef(node);
+            case "FuncFParams" -> visitFuncFParams(node);
+            case "FuncFParam" -> visitFuncFParam(node);
             case "Block" -> visitBlock(node);
             case "ConstDef" -> visitConstDef(node);
             case "ConstInitVal" -> visitConstInitVal(node);
@@ -119,27 +122,101 @@ public class Generator {
         }
     }
 
+    private void visitCompUnit(TreeNode<NodeData> node) {
+        // 程序中必须存在且仅存在一个标识为 main 的 FuncDef
+        int _mainCount = 0;
+        for (TreeNode<NodeData> child : node.children) {
+            if (child.data.name.equals("FuncDef") && child.getChildAt(1).data.value.equals("main"))
+                _mainCount += 1;
+        }
+        if (_mainCount != 1) error();
+
+        for (TreeNode<NodeData> child : node.children)
+            visit(child);
+    }
+
+    private Item funcNewItem;
+
     /**
      * 当前节点为 FuncDef 节点时，添加函数定义语句
      *
      * @param node FuncDef节点
      */
     private void visitFuncDef(TreeNode<NodeData> node) {
-        analyzer.filFuncDef(node);
+        funcNewItem = analyzer.filFuncDef(node);
         String funcName = node.getChildAt(1).data.value;
+
+        // 程序中必须存在且仅存在一个标识为 main、无参数、返回类型为 int 的 FuncDef
+        if (funcName.equals("main"))
+            if (node.children.size() != 5 || !node.getChildAt(0).getChildAt(0).data.value.equals("int"))
+                error();
+
         Item funcItem = symTable.getItem(funcName);
-        product += "define dso_local " + funcItem.vType + " @" + funcName + "() {\n";
         if (node.children.size() == 5) {
+            // 无参数的函数寄存器ID从1开始
+            regId = 1;
+            product += "define dso_local " + funcItem.vType + " @" + funcName + "() {\n";
             visit(node.getChildAt(4));
         } else {
+            // 有参数的函数寄存器ID从0开始
+            regId = 0;
+            product += "define dso_local " + funcItem.vType + " @" + funcName + "(";
+            visit(node.getChildAt(3));
+            regId++;
+            product += node.getChildAt(3).data.value + ") {\n";
+            // 对形参进行初始化
+            for (Item item : symTable.getParams(analyzer.curBlockId+1)) {
+                int _oldRegId = item.regId;
+                item.regId = regId;
+                product += "%" + (regId++) + " = alloca " + item.vType + "\n";
+                product += "store " + item.vType + " %" + _oldRegId + ", " + item.vType + "* %" + item.regId + "\n";
+            }
             visit(node.getChildAt(5));
         }
+        if (node.getChildAt(0).getChildAt(0).data.value.equals("void") && !hasRet())
+            product += "ret void\n";
         product += "}\n\n";
     }
 
+    private void visitFuncFParams(TreeNode<NodeData> node) {
+        StringBuilder _value = new StringBuilder();
+        for (TreeNode<NodeData> child : node.children) {
+            if (child.data.name.equals("FuncFParam")) {
+                visit(child);
+                _value.append(child.data.value).append(",");
+            }
+        }
+        node.data.value = StringUtils.chop(_value.toString());
+    }
+
+    private void visitFuncFParam(TreeNode<NodeData> node) {
+        Item _item = analyzer.filFuncFParam(node);
+        funcNewItem.funcParams.add(_item); // 记录函数参数列表
+        if (_item.vType == Item.ValueType.ARRAY) {
+            _item.arraySize.add(0);
+            for (TreeNode<NodeData> child : node.children) {
+                if (child.data.name.equals("Expr")) {
+                    // 函数形参数组的尺寸要求可求值的常量表达式
+                    if (!analyzer.isConstInitVal(child)) error();
+                    visit(child);
+                    _item.arraySize.add(child.data.intValue);
+                }
+            }
+        }
+        _item.regId = regId;
+        node.data.value = _item.vType + " %" + (regId++);
+    }
+
     private void visitBlock(TreeNode<NodeData> node) {
-        for (TreeNode<NodeData> child : node.children)
-            visit(child);
+        for (TreeNode<NodeData> child : node.children) {
+            switch (child.data.value) {
+                case "{", "}" -> analyzer.handleBlock(child);
+                // A new block
+                default -> {
+                    visit(child);
+                }
+            }
+        }
     }
 
     private void visitConstValDef(TreeNode<NodeData> node) {
@@ -156,13 +233,13 @@ public class Generator {
             product += decl + " = alloca " + declItem.vType + "\n";
             visit(node.getChildAt(2));
             if (declItem.blockId == 0) {
-                product += "store " + declItem.vType + " "
+                product += "store " + "i32 "
                         + node.getChildAt(2).data.value + ", "
-                        + declItem.vType + "* @" + declName + "\n";
+                        + "i32* @" + declName + "\n";
             } else {
-                product += "store " + declItem.vType + " "
+                product += "store " + "i32 "
                         + node.getChildAt(2).data.value + ", "
-                        + declItem.vType + "* " + decl + "\n";
+                        + "i32* " + decl + "\n";
             }
         }
         node.data.intValue = node.getChildAt(2).data.intValue;
@@ -310,6 +387,7 @@ public class Generator {
         visit(node.getChildAt(0));
         node.data.value = node.getChildAt(0).data.value;
         node.data.intValue = node.getChildAt(0).data.intValue;
+        node.data.dimension = node.getChildAt(0).data.dimension;
     }
 
     private void visitVarValDef(TreeNode<NodeData> node) {
@@ -334,13 +412,13 @@ public class Generator {
             if (node.children.size() >= 3) {
                 visit(node.getChildAt(2));
                 if (declItem.blockId == 0) {
-                    product += "store " + declItem.vType + " "
+                    product += "store i32 "
                             + node.getChildAt(2).data.value + ", "
-                            + declItem.vType + "* @" + declName + "\n";
+                            + "i32* @" + declName + "\n";
                 } else {
-                    product += "store " + declItem.vType + " "
+                    product += "store i32 "
                             + node.getChildAt(2).data.value + ", "
-                            + declItem.vType + "* " + decl + "\n";
+                            + "i32* " + decl + "\n";
                 }
                 declItem.intValue = node.getChildAt(2).data.intValue;
             }
@@ -537,7 +615,7 @@ public class Generator {
     }
 
     /**
-     * 处理 Stmt 节点的候选式 [Exp] ';'
+     * 处理 Stmt 节点的候选式 Exp ';'
      *
      * @param node Stmt节点
      */
@@ -545,6 +623,11 @@ public class Generator {
         visit(node.getChildAt(0));
         node.data.value = node.getChildAt(0).data.value;
         node.data.intValue = node.getChildAt(0).data.intValue;
+        node.data.dimension = node.getChildAt(0).data.dimension;
+    }
+
+    private void visitRetVoidStmt(TreeNode<NodeData> node) {
+        product += "ret void\n";
     }
 
     /**
@@ -568,9 +651,9 @@ public class Generator {
         Item valItem = symTable.getItem(val);
         visit(node.getChildAt(2));
         // 全局变量和局部变量的赋值不同，前者为 @，后者为 %
-        product += "store " + valItem.vType + " "
+        product += "store i32 "
                 + node.getChildAt(2).data.value + ", "
-                + valItem.vType + "* " + node.getChildAt(0).data.value + "\n";
+                + "i32* " + node.getChildAt(0).data.value + "\n";
     }
 
     /**
@@ -685,6 +768,7 @@ public class Generator {
                     case "Break" -> visitBreakStmt(node);
                     case "Continue" -> visitContinueStmt(node);
                     case "Expr" -> visitExprStmt(node);
+                    case "Return" -> visitRetVoidStmt(node);
                 }
             }
             case 3 -> {
@@ -713,6 +797,7 @@ public class Generator {
             visit(child);
         node.data.value = node.getChildAt(0).data.value;
         node.data.intValue = node.getChildAt(0).data.intValue;
+        node.data.dimension = node.getChildAt(0).data.dimension;
     }
 
     private void visitOperaExpr(TreeNode<NodeData> node) {
@@ -754,6 +839,7 @@ public class Generator {
             }
             node.data.value = value_2;
         }
+        node.data.dimension = node.getChildAt(0).data.dimension;
     }
 
     private void visitCmpExpr(TreeNode<NodeData> node) {
@@ -777,6 +863,7 @@ public class Generator {
             value_1 = value_2;
         }
         node.data.value = value_2;
+        node.data.dimension = node.getChildAt(0).data.dimension;
     }
 
     private void visitAndExpr(TreeNode<NodeData> node) {
@@ -828,6 +915,7 @@ public class Generator {
         visit(node.getChildAt(0));
         node.data.value = node.getChildAt(0).data.value;
         node.data.intValue = node.getChildAt(0).data.intValue;
+        node.data.dimension = node.getChildAt(0).data.dimension;
     }
 
     /**
@@ -838,17 +926,19 @@ public class Generator {
     private void visitFuncUE(TreeNode<NodeData> node) {
         String funcName = node.getChildAt(0).data.value;
         Item funcItem = symTable.getItem(funcName);
+        visit(node.getChildAt(2));
+        if (!analyzer.isFuncParamValid(node)) error();
         if (funcItem.vType == Item.ValueType.INT) {
             String reg = "%" + (regId++);
             node.data.value = reg;
             product += reg + " = ";
         }
-        visit(node.getChildAt(2));
         product += "call " + funcItem.vType
                 + " @" + funcName
                 + "("
                 + node.getChildAt(2).data.value
                 + ")\n";
+        node.data.dimension = 0;
     }
 
     /**
@@ -868,6 +958,7 @@ public class Generator {
                 + " @" + funcName
                 + "("
                 + ")\n";
+        node.data.dimension = 0;
     }
 
     /**
@@ -906,6 +997,7 @@ public class Generator {
                 node.data.value = newValue;
             }
         }
+        node.data.dimension = 0;
     }
 
     private void visitUnaryExpr(TreeNode<NodeData> node) {
@@ -925,15 +1017,18 @@ public class Generator {
             if (node.getChildAt(0).data.name.equals("Number")) {
                 node.data.value = node.getChildAt(0).data.value;
                 node.data.intValue = Integer.parseInt(node.data.value);
+                node.data.dimension = 0;
             } else if (node.getChildAt(0).data.name.equals("Lval")) {
                 visit(node.getChildAt(0));
                 node.data.value = node.getChildAt(0).data.value;
                 node.data.intValue = node.getChildAt(0).data.intValue;
+                node.data.dimension = node.getChildAt(0).data.dimension;
             }
         } else {
             visit(node.getChildAt(1));
             node.data.value = node.getChildAt(1).data.value;
             node.data.intValue = node.getChildAt(1).data.intValue;
+            node.data.dimension = node.getChildAt(1).data.dimension;
         }
     }
 
@@ -943,7 +1038,7 @@ public class Generator {
         for (int i = 0; i < childCnt; i += 2) {
             if (i >= 1) value += ",";
             visit(node.getChildAt(i));
-            value += "i32 " + node.getChildAt(i).data.value;
+            value += analyzer.funcRParamType(node.getChildAt(i)) + " " + node.getChildAt(i).data.value;
         }
         node.data.value = value;
     }
@@ -964,34 +1059,65 @@ public class Generator {
             else
                 product += "%" + valItem.regId + "\n";
         }
+        node.data.dimension = 0;
     }
 
     private void visitArrayLval(TreeNode<NodeData> node, boolean isRight) {
         String ident = node.getChildAt(0).data.value;
         Item arrayItem = symTable.getItem(ident);
         ArrayList<Integer> _arraySize = arrayItem.arraySize;
-        visit(node.getChildAt(2));
-        String reg = node.getChildAt(2).data.value;
-        int shapeIdx = 1;
-        for (int i = 5; i < node.children.size(); i += 3) {
-            visit(node.getChildAt(i));
-            String _tempReg = "%" + (regId++);
-            product += _tempReg + " = mul i32 " + reg + ", " + _arraySize.get(shapeIdx) + "\n";
-            reg = "%" + (regId++);
-            product += reg + " = add i32 " + _tempReg + ", " + node.getChildAt(i).data.value + "\n";
-            shapeIdx++;
+
+        String reg;
+        if (node.children.size() == 1) {
+            // 一般出现在调用函数传参中
+            reg = "0";
+            node.data.dimension = _arraySize.size();
+        } else {
+            visit(node.getChildAt(2));
+            reg = node.getChildAt(2).data.value;
+            int exprIdx = 5, _dimension = 0;
+            for (int shapeIdx = 1; shapeIdx < _arraySize.size(); shapeIdx++) {
+                if (exprIdx < node.children.size()) {
+                    visit(node.getChildAt(exprIdx));
+                    String _tempReg = "%" + (regId++);
+                    product += _tempReg + " = mul i32 " + reg + ", " + _arraySize.get(shapeIdx) + "\n";
+                    reg = "%" + (regId++);
+                    product += reg + " = add i32 " + _tempReg + ", " + node.getChildAt(exprIdx).data.value + "\n";
+                } else {
+                    _dimension += 1;
+                    String _tempReg = "%" + (regId++);
+                    product += _tempReg + " = mul i32 " + reg + ", " + _arraySize.get(shapeIdx) + "\n";
+                    reg = "%" + (regId++);
+                    product += reg + " = add i32 " + _tempReg + ", 0" + "\n";
+                }
+                exprIdx += 3;
+            }
+            node.data.dimension = _dimension;
         }
-        String _arrayPointer = "%" + (regId++);
+
+        String _arrayPointer;
         int _allSize = getAllSize(_arraySize);
-        if (arrayItem.blockId == 0)
+        if (arrayItem.blockId == 0) {
+            _arrayPointer = "%" + (regId++);
             product += _arrayPointer + " = getelementptr [" + _allSize + " x i32], ["
                     + _allSize + " x i32]* @" + arrayItem.name + ", i32 0, i32 " + reg + "\n";
-        else
-            product += _arrayPointer + " = getelementptr [" + _allSize + " x i32], ["
-                    + _allSize + " x i32]* %" + arrayItem.regId + ", i32 0, i32 " + reg + "\n";
+        } else {
+            if (arrayItem.iType == Item.IdentType.PARAM) {
+                String _regArray = "%" + (regId++);
+                product += _regArray + " = load i32*, i32** %" + arrayItem.regId + "\n";
+                _arrayPointer = "%" + (regId++);
+                product += _arrayPointer + " = getelementptr i32, i32* " + _regArray + ", i32 " + reg + "\n";
+            } else {
+                _arrayPointer = "%" + (regId++);
+                product += _arrayPointer + " = getelementptr [" + _allSize + " x i32], ["
+                        + _allSize + " x i32]* %" + arrayItem.regId + ", i32 0, i32 " + reg + "\n";
+            }
+        }
         node.data.value = _arrayPointer;
 
-        if (isRight) {
+        // Lval在右侧且不为函数传参，或者，若其为函数传参但作为Int被调用时，加load
+        if ((isRight && !analyzer.belFuncRParams(node)) ||
+                (analyzer.belFuncRParams(node) && analyzer.arrayLvalType(node) == Item.ValueType.INT)) {
             String _rReg = "%" + (regId++);
             product += _rReg + " = load i32, i32* " + _arrayPointer + "\n";
             node.data.value = _rReg;
@@ -999,19 +1125,9 @@ public class Generator {
     }
 
     private void visitLval(TreeNode<NodeData> node) {
-        if (node.children.size() == 1) {
-            if (!analyzer.isNoArrayLvalValid(node)) error();
-            if (node.parent.data.name.equals("Stmt")) {
-                // Stmt -> Lval = Exp ; --- Lval -> Ident
-                Item _ident = symTable.getItem(node.getChildAt(0).data.value);
-                if (_ident.blockId == 0)
-                    node.data.value = "@" + _ident.name;
-                else
-                    node.data.value = "%" + _ident.regId;
-            } else {
-                visitNoArrayRLval(node);
-            }
-        } else {
+        Item _identItem = symTable.getItem(node.getChildAt(0).data.value);
+
+        if (_identItem.vType == Item.ValueType.ARRAY) {
             if (!analyzer.isArrayLvalValid(node))
                 error();
             if (node.parent.data.name.equals("Stmt")) {
@@ -1019,6 +1135,17 @@ public class Generator {
                 visitArrayLval(node, false);
             } else {
                 visitArrayLval(node, true);
+            }
+        } else {
+            if (!analyzer.isNoArrayLvalValid(node)) error();
+            if (node.parent.data.name.equals("Stmt")) {
+                // Stmt -> Lval = Exp ; --- Lval -> Ident
+                if (_identItem.blockId == 0)
+                    node.data.value = "@" + _identItem.name;
+                else
+                    node.data.value = "%" + _identItem.regId;
+            } else {
+                visitNoArrayRLval(node);
             }
         }
     }
