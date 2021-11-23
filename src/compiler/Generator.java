@@ -30,6 +30,8 @@ public class Generator {
      */
     private Stack<Recorder> stk = new Stack<Recorder>();
 
+    private int markId;
+
     private class Mark {
         String tag;
 
@@ -64,6 +66,8 @@ public class Generator {
                 """;
         this.symTable = new SymTable();
         this.analyzer = new Analyzer(ast, symTable);
+
+        this.markId = 0;
     }
 
     public SymTable getSymTable() {
@@ -104,7 +108,10 @@ public class Generator {
             case "Lval" -> visitLval(node);
             case "Cond" -> visitCond(node);
             case "RelExpr", "EqExpr" -> visitCmpExpr(node);
-            case "LAndExpr", "LOrExpr" -> visitLogicExpr(node);
+            // TODO: CIRCUIT
+            case "LAndExpr" -> visitAndExpr(node);
+            case "LOrExpr" -> visitOrExpr(node);
+//            case "LAndExpr", "LOrExpr" -> visitLogicExpr(node);
             default -> {
                 for (TreeNode<NodeData> child : node.children)
                     visit(child);
@@ -572,10 +579,12 @@ public class Generator {
      * @param node Stmt节点
      */
     private void visitIfStmt(TreeNode<NodeData> node) {
+        stk.push(new Recorder());
+
         visit(node.getChildAt(2));
         product += "br i1 " + node.getChildAt(2).data.value
                 + ", label ";
-        int len = product.length();
+        String mark_1 = "IF" + (++markId);
         int reg_1 = (regId++);
         product += "\n" + reg_1 + ":\n";
         visit(node.getChildAt(4));
@@ -583,7 +592,15 @@ public class Generator {
         if (!hasRet())
             product += "br label %" + reg_2 + "\n";
         product += "\n" + reg_2 + ":\n";
-        insRecord(len, "%" + reg_1 + ", label %" + reg_2 + "\n");
+        repRecord(mark_1, "%" + reg_1 + ", label %" + reg_2 + "\n");
+
+        for (var mark : stk.peek().marks) {
+            if (mark.tag.startsWith("CIRCUIT_AND"))
+                repRecord(mark.tag, "%" + reg_2);
+            else if (mark.tag.startsWith("CIRCUIT_OR"))
+                repRecord(mark.tag, "%" + reg_1);
+        }
+        stk.pop();
     }
 
     /**
@@ -592,23 +609,37 @@ public class Generator {
      * @param node Stmt节点
      */
     private void visitIfElseStmt(TreeNode<NodeData> node) {
+        stk.push(new Recorder());
+
         visit(node.getChildAt(2));
         product += "br i1 " + node.getChildAt(2).data.value + ", label ";
-        int len_1 = product.length();
+        String mark_1 = "IF_ELSE" + (++markId);
+        product += mark_1;
         int reg_1 = (regId++);
         product += "\n" + reg_1 + ":\n";
         visit(node.getChildAt(4));
+        String mark_2 = "IF_ELSE" + (++markId);
         int len_2 = product.length();
+        product += mark_2;
         int reg_2 = (regId++);
         product += "\n" + reg_2 + ":\n";
+        // TODO: CIRCUIT
         visit(node.getChildAt(6));
         int reg_3 = (regId++);
         if (!hasRet())
             product += "br label %" + reg_3 + "\n";
         product += "\n" + reg_3 + ":\n";
         if (!hasRet(len_2))
-            insRecord(len_2, "br label %" + reg_3 + "\n");
-        insRecord(len_1, "%" + reg_1 + ", label %" + reg_2 + "\n");
+            repRecord(mark_2, "br label %" + reg_3 + "\n");
+        repRecord(mark_1, "%" + reg_1 + ", label %" + reg_2 + "\n");
+
+        for (var mark : stk.peek().marks) {
+            if (mark.tag.startsWith("CIRCUIT_AND"))
+                repRecord(mark.tag, "%" + reg_2);
+            else if (mark.tag.startsWith("CIRCUIT_OR"))
+                repRecord(mark.tag, "%" + reg_1);
+        }
+        stk.pop();
     }
 
     /**
@@ -748,20 +779,44 @@ public class Generator {
         node.data.value = value_2;
     }
 
-    private void visitLogicExpr(TreeNode<NodeData> node) {
+    private void visitAndExpr(TreeNode<NodeData> node) {
         visit(node.getChildAt(0));
         String value_1 = node.getChildAt(0).data.value;
-        String value_2 = node.getChildAt(0).data.value;
-        for (int i = 2; i < node.children.size(); i+=2) {
+        String value_2;
+        for (int i = 2; i < node.children.size(); i += 2) {
+            value_2 = String.valueOf(regId++);
+
+            String mark = "CIRCUIT_AND" + (++markId);
+            stk.peek().record(new Mark(mark));
+
+            product += "br i1 " + node.getChildAt(i-2).data.value
+                    + ", label %" + value_2
+                    + ", label " + mark + "\n"
+                    + "\n" + value_2 + ":\n";
             visit(node.getChildAt(i));
-            value_2 = "%" + (regId++);
-            product += value_2 + " = "
-                    + flagOfOpera(node.getChildAt(i-1).data.value)
-                    + " i1 " + value_1
-                    + ", " + node.getChildAt(i).data.value + "\n";
-            value_1 = value_2;
+            value_1 = node.getChildAt(i).data.value;
         }
-        node.data.value = value_2;
+        node.data.value = value_1;
+    }
+
+    private void visitOrExpr(TreeNode<NodeData> node) {
+        visit(node.getChildAt(0));
+        String value_1 = node.getChildAt(0).data.value;
+        String value_2;
+        for (int i = 2; i < node.children.size(); i += 2) {
+            value_2 = String.valueOf(regId++);
+
+            String mark = "CIRCUIT_OR" + (++markId);
+            stk.peek().record(new Mark(mark));
+
+            product += "br i1 " + node.getChildAt(i-2).data.value
+                    + ", label " + mark
+                    + ", label %" + value_2 + "\n"
+                    + "\n" + value_2 + ":\n";
+            visit(node.getChildAt(i));
+            value_1 = node.getChildAt(i).data.value;
+        }
+        node.data.value = value_1;
     }
 
     /**
