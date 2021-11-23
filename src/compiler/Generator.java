@@ -737,9 +737,10 @@ public class Generator {
         product += "br label %" + reg_1 + "\n";
         product += "\n" + reg_1 + ":\n";
         visit(node.getChildAt(2));
+        String mark_1 = "WHILE" + (++markId);
         product += "br i1 " + node.getChildAt(2).data.value
-                + ", label ";
-        int len = product.length();
+                + ", label " + mark_1;
+
         int reg_2 = (regId++);
         product += "\n" + reg_2 + ":\n";
         visit(node.getChildAt(4));
@@ -748,14 +749,17 @@ public class Generator {
             product += "br label %" + reg_1 + "\n";
         int reg_3 = (regId++);
         product += "\n" + reg_3 + ":\n";
-        insRecord(len, "%" + reg_2 + ", label %" + reg_3 + "\n");
+        repRecord(mark_1, "%" + reg_2 + ", label %" + reg_3 + "\n");
 
         for (var mark : stk.peek().marks) {
-            if (mark.tag.startsWith("break")) {
+            if (mark.tag.startsWith("break"))
                 repRecord(mark.tag, "br label %" + reg_3 + "\n");
-            } else if (mark.tag.startsWith("continue")) {
+            else if (mark.tag.startsWith("continue"))
                 repRecord(mark.tag, "br label %" + reg_1 + "\n");
-            }
+            else if (mark.tag.startsWith("CIRCUIT_AND"))
+                repRecord(mark.tag, "%" + reg_3);
+            else if (mark.tag.startsWith("CIRCUIT_OR"))
+                repRecord(mark.tag, "%" + reg_2);
         }
         stk.pop();
     }
