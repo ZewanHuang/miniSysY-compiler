@@ -665,9 +665,9 @@ public class Generator {
         stk.push(new Recorder());
 
         visit(node.getChildAt(2));
-        product += "br i1 " + node.getChildAt(2).data.value
-                + ", label ";
         String mark_1 = "IF" + (++markId);
+        product += "br i1 " + node.getChildAt(2).data.value
+                + ", label " + mark_1;
         int reg_1 = (regId++);
         product += "\n" + reg_1 + ":\n";
         visit(node.getChildAt(4));
