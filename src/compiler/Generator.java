@@ -364,6 +364,29 @@ public class Generator {
             }
         } else {
             if (!analyzer.hasCerVal(node)) error();
+
+            if (node.getChildAt(0).data.name.equals("ConstExpr")) {
+                if (initDepth(node) != this.arrayShape.size()) error();
+                visit(node.getChildAt(0));
+
+                String reg = "%" + (regId++);
+                int size = getAllSize(this.arrayShape);
+                product += reg + " = getelementptr [" + size
+                        + " x i32],[" + size + " x i32]* %" + arrayRegId(node)
+                        + ", i32 0, i32 " + getElePos(node) + "\n"
+                        + "store i32 " + node.getChildAt(0).data.value
+                        + ", i32* " + reg + "\n";
+            } else {
+                int cnt = 0;
+                for (TreeNode<NodeData> child : node.children) {
+                    if (child.data.name.equals("ConstInitVal")) {
+                        cnt++;
+                        visitConstInitArray(child);
+                    }
+                }
+                int _fill_size = fillEmptySize(node, cnt);
+                if (_fill_size < 0) error();
+            }
         }
     }
 
@@ -489,7 +512,7 @@ public class Generator {
     private int getInitValIndex(TreeNode<NodeData> node) {
         int idx = 0;
         for (TreeNode<NodeData> child : node.parent.children) {
-            if (child.data.name.equals("InitVal")) {
+            if (child.data.name.equals("InitVal") || child.data.name.equals("ConstInitVal")) {
                 if (child == node)
                     break;
                 idx++;
