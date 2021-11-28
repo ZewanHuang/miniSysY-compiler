@@ -45,3 +45,9 @@ image = { source = "dockerfile", path = ".", tag = "lab8" }
 run = [
     "java Main -llvm $input -o $ir",
 ]
+
+[jobs.mdarray]
+image = { source = "dockerfile", path = ".", tag = "mdarray" }
+run = [
+    "java Main -llvm $input -o $ir",
+]
