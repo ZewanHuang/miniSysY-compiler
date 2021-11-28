@@ -701,9 +701,12 @@ public class Generator {
         int reg_1 = (regId++);
         product += "\n" + reg_1 + ":\n";
         visit(node.getChildAt(4));
-        String mark_2 = "IF_ELSE" + (++markId);
         int len_2 = product.length();
-        product += mark_2;
+        String mark_2 = "";
+        if (!hasRet(len_2)) {
+            mark_2 = "IF_ELSE" + (++markId);
+            product += mark_2;
+        }
         int reg_2 = (regId++);
         product += "\n" + reg_2 + ":\n";
         // TODO: CIRCUIT
