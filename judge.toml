@@ -45,3 +45,10 @@ image = { source = "dockerfile", path = ".", tag = "lab8" }
 run = [
     "java Main -llvm $input -o $ir",
 ]
+
+[jobs.short_circuit]
+
+image = { source = "dockerfile", path = ".", tag = "short_circuit" }
+run = [
+    "java Main -llvm $input -o $ir",
+]
