@@ -57,8 +57,22 @@ void visitIfElseStmt() {
 ```
 
 ```java
+void visitOrExpr() {
+    visit(AndExpr);
+    for (i = 2; i < children.size; i += 2) {
+        for (var mark : stk.peek().marks)
+        	replace_with_record_AND_Expr(mark, value);
+        
+        stk.peek().record(mark3);
+        add_br(mark3);
+        new_br_block();
+    }
+}
+```
+
+```java
 void visitAndExpr() {
-    visit(OrExpr);
+    visit(EqExp);
     for (i = 2; i < children.size; i += 2) {
         stk.peek().record(mark3);
         add_br(mark3);
@@ -66,6 +80,8 @@ void visitAndExpr() {
     }
 }
 ```
+
+需要注意的是，可能出现与、或同时出现，因此需要在VisitOrExpr中，当有多个AndExpr时对AND进行回填。
 
 ## 参考文献
 
