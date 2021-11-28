@@ -815,28 +815,32 @@ public class Generator {
             // 计算实际值
             Integer v1 = node.getChildAt(0).data.intValue;
             Integer v2 = v1;
-            if (v1 == null) return;
+//            if (v1 == null) return;
             for (int i = 2; i < node.children.size(); i+=2) {
                 visit(node.getChildAt(i));
                 Integer v_temp = node.getChildAt(i).data.intValue;
-                if (v_temp == null) return;
-                switch (node.getChildAt(i-1).data.value) {
-                    case "+" -> v2 = v1 + v_temp;
-                    case "-" -> v2 = v1 - v_temp;
-                    case "*" -> v2 = v1 * v_temp;
-                    case "/" -> v2 = v1 / v_temp;
-                    case "%" -> v2 = v1 % v_temp;
+//                if (v_temp == null) return;
+                if (v1 != null && v_temp != null) {
+                    switch (node.getChildAt(i-1).data.value) {
+                        case "+" -> v2 = v1 + v_temp;
+                        case "-" -> v2 = v1 - v_temp;
+                        case "*" -> v2 = v1 * v_temp;
+                        case "/" -> v2 = v1 / v_temp;
+                        case "%" -> v2 = v1 % v_temp;
+                    }
                 }
                 v1 = v2;
             }
             node.data.intValue = v2;
         }
         if (analyzer.curBlockId > 0) {
-            if (!computed) visit(node.getChildAt(0));
+            if (!computed)
+                visit(node.getChildAt(0));
             String value_1 = node.getChildAt(0).data.value;
             String value_2 = node.getChildAt(0).data.value;
             for (int i = 2; i < node.children.size(); i+=2) {
-                if (!computed) visit(node.getChildAt(i));
+                if (!computed)
+                    visit(node.getChildAt(i));
                 value_2 = "%" + (regId++);
                 product += value_2 + " = "
                         + flagOfOpera(node.getChildAt(i-1).data.value)
