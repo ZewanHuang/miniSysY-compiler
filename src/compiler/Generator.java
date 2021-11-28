@@ -907,6 +907,11 @@ public class Generator {
             String mark = "CIRCUIT_OR" + (++markId);
             stk.peek().record(new Mark(mark));
 
+            for (var t_mark : stk.peek().marks) {
+                if (t_mark.tag.startsWith("CIRCUIT_AND"))
+                    repRecord(t_mark.tag, "%" + value_2);
+            }
+
             product += "br i1 " + node.getChildAt(i-2).data.value
                     + ", label " + mark
                     + ", label %" + value_2 + "\n"
