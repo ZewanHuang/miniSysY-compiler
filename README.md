@@ -19,7 +19,7 @@ cd src
 javac -encoding UTF-8 -d ./output Main.java
 ```
 
-项目编译结果在 `./output` 目录下。
+项目编译结果在 `./output` 目录下，执行下列命令需要先 `cd output`。
 
 ### 生成中间代码
 
